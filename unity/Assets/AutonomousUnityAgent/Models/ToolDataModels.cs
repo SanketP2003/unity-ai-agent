@@ -5,39 +5,47 @@ using UnityEngine;
 namespace AutonomousUnityAgent.Models
 {
     [Serializable]
-    public struct Vector3Data
+    public class Vector3Data
     {
         public float x;
         public float y;
         public float z;
 
+        public Vector3Data() { }
+
+        public Vector3Data(float x, float y, float z)
+        {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
         public Vector3 ToVector3() => new Vector3(x, y, z);
 
-        public static Vector3Data FromVector3(Vector3 v) => new Vector3Data
-        {
-            x = v.x,
-            y = v.y,
-            z = v.z
-        };
+        public static Vector3Data FromVector3(Vector3 v) => new Vector3Data(v.x, v.y, v.z);
     }
 
     [Serializable]
-    public struct ColorData
+    public class ColorData
     {
         public float r;
         public float g;
         public float b;
-        public float a;
+        public float a = 1f;
+
+        public ColorData() { }
+
+        public ColorData(float r, float g, float b, float a = 1f)
+        {
+            this.r = r;
+            this.g = g;
+            this.b = b;
+            this.a = a;
+        }
 
         public Color ToColor() => new Color(r, g, b, a <= 0.001f ? 1f : a);
 
-        public static ColorData FromColor(Color c) => new ColorData
-        {
-            r = c.r,
-            g = c.g,
-            b = c.b,
-            a = c.a
-        };
+        public static ColorData FromColor(Color c) => new ColorData(c.r, c.g, c.b, c.a);
     }
 
     [Serializable]

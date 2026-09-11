@@ -116,8 +116,8 @@ public class UnityTools {
         public String validate(Map<String, Object> parameters) {
             if (parameters != null && parameters.containsKey("setup")) {
                 String setup = String.valueOf(parameters.get("setup"));
-                if (!Set.of("EmptyScene", "DefaultGame").contains(setup)) {
-                    return "Parameter 'setup' must be either 'EmptyScene' or 'DefaultGame'";
+                if (!Set.of("EmptyScene", "DefaultGameObjects", "DefaultGame", "DefaultScene").contains(setup)) {
+                    return "Parameter 'setup' must be either 'EmptyScene' or 'DefaultGameObjects'";
                 }
             }
             return null;

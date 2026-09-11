@@ -1,3 +1,4 @@
+#pragma warning disable CS0618
 using System;
 using System.Collections.Generic;
 using AutonomousUnityAgent.Models;
@@ -78,8 +79,8 @@ namespace AutonomousUnityAgent.Editor.Tools
 
         public BridgeMessage Execute(BridgeMessage request)
         {
-            string setupStr = ToolParamHelper.ExtractString(request.parameters, "setup", "DefaultGame");
-            NewSceneSetup setup = setupStr == "EmptyScene" ? NewSceneSetup.EmptyScene : NewSceneSetup.DefaultGame;
+            string setupStr = ToolParamHelper.ExtractString(request.parameters, "setup", "DefaultGameObjects");
+            NewSceneSetup setup = setupStr == "EmptyScene" ? NewSceneSetup.EmptyScene : NewSceneSetup.DefaultGameObjects;
 
             Scene newScene = EditorSceneManager.NewScene(setup, NewSceneMode.Single);
 
