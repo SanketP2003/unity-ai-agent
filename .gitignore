@@ -1,0 +1,45 @@
+# Autonomous Unity Agent
+*.class
+*.jar
+*.war
+*.ear
+*.log
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# Unity
+unity/Library/
+unity/Temp/
+unity/Obj/
+unity/Build/
+unity/Builds/
+unity/Logs/
+unity/UserSettings/
+unity/MemoryCaptures/
+unity/Recordings/
+unity/Assets/Plugins/Editor/JetBrains/
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+sysinfo.txt
+*.apk
+*.aab
+*.unitypackage
+*.app
+crashlytics-build.properties
+
+# IDE
+.idea/
+.vs/
+*.suo
+*.user
+*.csproj
+*.sln
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+*.env.local

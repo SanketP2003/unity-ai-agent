@@ -1,0 +1,24 @@
+server:
+  port: 8080
+
+unity:
+  websocket:
+    endpoint: /unity-bridge
+    ping-interval-seconds: 15
+    command-timeout-seconds: 30
+
+logging:
+  level:
+    root: INFO
+    com.unityagent: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+spring:
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      indent-output: true
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
