@@ -921,4 +921,181 @@ textarea#user-prompt {
   background-color: var(--bg-card);
 }
 
+/* Phase 9 Autonomy Dashboard */
+.autonomy-panel {
+  background: linear-gradient(180deg, #161b22, #0d1117);
+  border-bottom: 2px solid var(--accent-blue);
+  padding: 16px 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  animation: fadeIn 0.2s ease-out;
+  flex-shrink: 0;
+}
+
+.autonomy-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.autonomy-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.autonomy-icon {
+  font-size: 20px;
+}
+
+.autonomy-title h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badge-idle { background: #30363d; color: var(--text-muted); }
+.badge-running { background: rgba(56, 139, 253, 0.2); color: var(--accent-blue-hover); border: 1px solid var(--accent-blue); }
+.badge-paused { background: rgba(210, 153, 34, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+.badge-completed { background: rgba(63, 185, 80, 0.2); color: var(--accent-green-bright); border: 1px solid var(--accent-green); }
+.badge-failed { background: rgba(248, 81, 73, 0.2); color: var(--accent-red-hover); border: 1px solid var(--accent-red); }
+
+.autonomy-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-small {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.autonomy-metrics-strip {
+  display: flex;
+  gap: 16px;
+  background: var(--bg-card);
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.metric-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.metric-label {
+  color: var(--text-muted);
+}
+
+.metric-val {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.intervention-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(210, 153, 34, 0.15);
+  border: 1px solid var(--accent-amber);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  color: var(--text-main);
+}
+
+.intervention-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-success {
+  background: var(--accent-green);
+  color: #fff;
+  border: 1px solid var(--accent-green-bright);
+}
+
+.btn-success:hover {
+  background: #2ea043;
+}
+
+.autonomy-dag-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.autonomy-nodes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.empty-dag-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 12px;
+}
+
+.dag-node-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--bg-panel);
+  border-radius: 6px;
+  border-left: 3px solid var(--border-bright);
+  font-size: 12px;
+}
+
+.dag-node-item.node-COMPLETED { border-left-color: var(--accent-green-bright); }
+.dag-node-item.node-IN_PROGRESS { border-left-color: var(--accent-blue-hover); background: rgba(56, 139, 253, 0.08); }
+.dag-node-item.node-READY { border-left-color: var(--accent-blue); }
+.dag-node-item.node-FAILED { border-left-color: var(--accent-red-hover); }
+
+.node-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.node-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.node-desc {
+  color: var(--text-main);
+}
+
+.node-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+
 

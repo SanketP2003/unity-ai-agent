@@ -37,6 +37,10 @@
           </div>
         </div>
 
+        <button id="btn-toggle-autonomy" class="btn btn-primary" title="Phase 9 Long-Horizon Autonomous Development">
+          ⚡ Autonomy DAG
+        </button>
+
         <button id="btn-open-settings" class="btn btn-secondary" title="Configure AI Provider and Credentials">
           ⚙️ Settings
         </button>
@@ -48,6 +52,66 @@
         </div>
       </div>
     </header>
+
+    <!-- Phase 9 Autonomy Dashboard / DAG Panel -->
+    <div id="autonomy-panel" class="autonomy-panel hidden">
+      <div class="autonomy-header">
+        <div class="autonomy-title">
+          <span class="autonomy-icon">⚡</span>
+          <h3>Phase 9 Long-Horizon Autonomy Engine</h3>
+          <span id="autonomy-status-badge" class="badge badge-idle">IDLE</span>
+        </div>
+        <div class="autonomy-actions">
+          <button id="btn-autonomy-step" class="btn btn-small btn-primary" disabled>Step Next</button>
+          <button id="btn-autonomy-pause" class="btn btn-small btn-secondary" disabled>Pause</button>
+          <button id="btn-autonomy-resume" class="btn btn-small btn-secondary" disabled>Resume</button>
+          <button id="btn-autonomy-validate" class="btn btn-small btn-secondary">Completion Gate</button>
+          <button id="btn-close-autonomy" class="modal-close-btn">&times;</button>
+        </div>
+      </div>
+
+      <div class="autonomy-body">
+        <div class="autonomy-metrics-strip">
+          <div class="metric-item">
+            <span class="metric-label">Nodes:</span>
+            <span id="metric-nodes" class="metric-val">0/0</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Tool Calls:</span>
+            <span id="metric-tool-calls" class="metric-val">0</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Recovery Cycles:</span>
+            <span id="metric-recovery" class="metric-val">0</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Replans:</span>
+            <span id="metric-replans" class="metric-val">0</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Checkpoint:</span>
+            <span id="metric-checkpoint" class="metric-val">None</span>
+          </div>
+        </div>
+
+        <div id="intervention-banner" class="intervention-banner hidden">
+          <div class="intervention-content">
+            <strong id="intervention-title">Human Intervention Required:</strong>
+            <span id="intervention-message">Autonomy limit reached</span>
+          </div>
+          <div class="intervention-btns">
+            <button id="btn-approve-intervention" class="btn btn-small btn-success">Approve</button>
+            <button id="btn-reject-intervention" class="btn btn-small btn-danger">Halt</button>
+          </div>
+        </div>
+
+        <div class="autonomy-dag-container">
+          <div id="autonomy-nodes-list" class="autonomy-nodes-list">
+            <div class="empty-dag-note">No active long-horizon autonomous run. Start a run or enter a full game prompt.</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Goal & Agent State Banner -->
     <div id="goal-banner" class="goal-banner hidden">

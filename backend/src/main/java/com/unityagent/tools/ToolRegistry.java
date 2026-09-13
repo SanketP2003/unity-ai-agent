@@ -163,4 +163,77 @@ public class ToolRegistry {
     public int size() {
         return tools.size();
     }
+
+    /**
+     * Finds tools belonging to a specific functional domain.
+     */
+    public List<Tool> getToolsByDomain(String domain) {
+        if (domain == null) return List.of();
+        List<Tool> result = new ArrayList<>();
+        for (Tool tool : tools.values()) {
+            if (domain.equalsIgnoreCase(tool.domain())) {
+                result.add(tool);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Finds tools that produce a specific artifact, state, or entity.
+     */
+    public List<Tool> getToolsProducing(String artifact) {
+        if (artifact == null) return List.of();
+        List<Tool> result = new ArrayList<>();
+        for (Tool tool : tools.values()) {
+            for (String prod : tool.produces()) {
+                if (artifact.equalsIgnoreCase(prod)) {
+                    result.add(tool);
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Finds tools requiring a specific prerequisite state.
+     */
+    public List<Tool> getToolsRequiring(String prerequisite) {
+        if (prerequisite == null) return List.of();
+        List<Tool> result = new ArrayList<>();
+        for (Tool tool : tools.values()) {
+            for (String req : tool.prerequisites()) {
+                if (prerequisite.equalsIgnoreCase(req)) {
+                    result.add(tool);
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Finds tools matching a specific risk level.
+     */
+    public List<Tool> getToolsByRisk(ToolRiskLevel risk) {
+        if (risk == null) return List.of();
+        List<Tool> result = new ArrayList<>();
+        for (Tool tool : tools.values()) {
+            if (tool.riskLevel() == risk) {
+                result.add(tool);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * @return all tool definitions
+     */
+    public List<ToolDefinition> getDefinitions() {
+        List<ToolDefinition> defs = new ArrayList<>();
+        for (Tool tool : tools.values()) {
+            defs.add(tool.definition());
+        }
+        return defs;
+    }
 }

@@ -882,4 +882,189 @@
     return text;
   }
 
+  // --- Phase 9 Autonomy Engine Dashboard Logic ---
+  let activeAutonomyRunId = null;
+
+  const btnToggleAutonomy = document.getElementById('btn-toggle-autonomy');
+  const autonomyPanel = document.getElementById('autonomy-panel');
+  const btnCloseAutonomy = document.getElementById('btn-close-autonomy');
+  const btnAutonomyStep = document.getElementById('btn-autonomy-step');
+  const btnAutonomyPause = document.getElementById('btn-autonomy-pause');
+  const btnAutonomyResume = document.getElementById('btn-autonomy-resume');
+  const btnAutonomyValidate = document.getElementById('btn-autonomy-validate');
+  const btnApproveIntervention = document.getElementById('btn-approve-intervention');
+  const btnRejectIntervention = document.getElementById('btn-reject-intervention');
+  const autonomyStatusBadge = document.getElementById('autonomy-status-badge');
+  const interventionBanner = document.getElementById('intervention-banner');
+  const interventionMessage = document.getElementById('intervention-message');
+  const nodesListContainer = document.getElementById('autonomy-nodes-list');
+
+  if (btnToggleAutonomy && autonomyPanel) {
+    btnToggleAutonomy.addEventListener('click', () => {
+      autonomyPanel.classList.toggle('hidden');
+      if (!autonomyPanel.classList.contains('hidden') && activeAutonomyRunId) {
+        refreshAutonomyState(activeAutonomyRunId);
+      }
+    });
+  }
+
+  if (btnCloseAutonomy && autonomyPanel) {
+    btnCloseAutonomy.addEventListener('click', () => {
+      autonomyPanel.classList.add('hidden');
+    });
+  }
+
+  async function refreshAutonomyState(runId) {
+    if (!runId) return;
+    try {
+      const res = await fetch(`/api/autonomy/${runId}/state`);
+      if (!res.ok) return;
+      const state = await res.json();
+      renderAutonomyDashboard(state);
+    } catch (err) {
+      console.warn('Failed to refresh autonomy state:', err);
+    }
+  }
+
+  function renderAutonomyDashboard(state) {
+    if (!state) return;
+    activeAutonomyRunId = state.runId;
+
+    if (autonomyStatusBadge) {
+      autonomyStatusBadge.textContent = state.status || 'IDLE';
+      autonomyStatusBadge.className = `badge badge-${(state.status || 'idle').toLowerCase()}`;
+    }
+
+    // Update buttons
+    const isRunning = state.status === 'RUNNING';
+    const isPaused = state.status === 'PAUSED';
+    if (btnAutonomyStep) btnAutonomyStep.disabled = !isRunning;
+    if (btnAutonomyPause) btnAutonomyPause.disabled = !isRunning;
+    if (btnAutonomyResume) btnAutonomyResume.disabled = !isPaused;
+
+    // Metrics
+    const completed = state.executionState ? (state.executionState.completedNodes ? Object.keys(state.executionState.completedNodes).length : 0) : 0;
+    const total = state.plan && state.plan.planNodes ? Object.keys(state.plan.planNodes).length : 0;
+    const mNodes = document.getElementById('metric-nodes');
+    if (mNodes) mNodes.textContent = `${completed}/${total}`;
+
+    const mToolCalls = document.getElementById('metric-tool-calls');
+    if (mToolCalls) mToolCalls.textContent = state.executionState ? state.executionState.totalToolCalls : 0;
+
+    const mRecovery = document.getElementById('metric-recovery');
+    if (mRecovery) mRecovery.textContent = state.executionState ? state.executionState.recoveryCycles : 0;
+
+    const mReplans = document.getElementById('metric-replans');
+    if (mReplans) mReplans.textContent = state.executionState ? state.executionState.replans : 0;
+
+    const mCheckpoint = document.getElementById('metric-checkpoint');
+    if (mCheckpoint) mCheckpoint.textContent = state.lastCheckpointId ? state.lastCheckpointId.substring(0, 16) + '...' : 'None';
+
+    // Intervention
+    if (state.currentIntervention && !state.currentIntervention.resolved) {
+      if (interventionBanner) interventionBanner.classList.remove('hidden');
+      if (interventionMessage) interventionMessage.textContent = state.currentIntervention.message;
+    } else {
+      if (interventionBanner) interventionBanner.classList.add('hidden');
+    }
+
+    // Render DAG nodes
+    if (nodesListContainer && state.plan && state.plan.planNodes) {
+      nodesListContainer.innerHTML = '';
+      const nodes = Object.values(state.plan.planNodes);
+      if (nodes.length === 0) {
+        nodesListContainer.innerHTML = '<div class="empty-dag-note">No nodes in plan.</div>';
+        return;
+      }
+
+      nodes.forEach(node => {
+        const item = document.createElement('div');
+        item.className = `dag-node-item node-${node.status}`;
+        item.innerHTML = `
+          <div class="node-title-group">
+            <span class="node-id">${escapeHtml(node.nodeId)}</span>
+            <span class="node-desc">${escapeHtml(node.description)}</span>
+          </div>
+          <span class="node-badge badge-${node.status.toLowerCase()}">${escapeHtml(node.status)}</span>
+        `;
+        nodesListContainer.appendChild(item);
+      });
+    }
+  }
+
+  if (btnAutonomyStep) {
+    btnAutonomyStep.addEventListener('click', async () => {
+      if (!activeAutonomyRunId) return;
+      btnAutonomyStep.disabled = true;
+      try {
+        const res = await fetch(`/api/autonomy/${activeAutonomyRunId}/step`, { method: 'POST' });
+        if (res.ok) {
+          await refreshAutonomyState(activeAutonomyRunId);
+        }
+      } catch (err) {
+        console.error('Step execution error:', err);
+      } finally {
+        btnAutonomyStep.disabled = false;
+      }
+    });
+  }
+
+  if (btnAutonomyPause) {
+    btnAutonomyPause.addEventListener('click', async () => {
+      if (!activeAutonomyRunId) return;
+      await fetch(`/api/autonomy/${activeAutonomyRunId}/pause`, { method: 'POST' });
+      await refreshAutonomyState(activeAutonomyRunId);
+    });
+  }
+
+  if (btnAutonomyResume) {
+    btnAutonomyResume.addEventListener('click', async () => {
+      if (!activeAutonomyRunId) return;
+      await fetch(`/api/autonomy/${activeAutonomyRunId}/resume`, { method: 'POST' });
+      await refreshAutonomyState(activeAutonomyRunId);
+    });
+  }
+
+  if (btnAutonomyValidate) {
+    btnAutonomyValidate.addEventListener('click', async () => {
+      if (!activeAutonomyRunId) {
+        alert('No active autonomy run to validate.');
+        return;
+      }
+      try {
+        const res = await fetch(`/api/autonomy/${activeAutonomyRunId}/validation`);
+        if (res.ok) {
+          const val = await res.json();
+          alert(`Completion Gate: ${val.gatePassed ? 'PASSED ✅' : 'REJECTED ❌'}\n\nSummary: ${val.summary || 'N/A'}`);
+        }
+      } catch (e) {
+        alert('Failed to fetch validation: ' + e.message);
+      }
+    });
+  }
+
+  if (btnApproveIntervention) {
+    btnApproveIntervention.addEventListener('click', async () => {
+      if (!activeAutonomyRunId) return;
+      await fetch(`/api/autonomy/${activeAutonomyRunId}/intervene`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approve: true, notes: 'Approved by user via dashboard' })
+      });
+      await refreshAutonomyState(activeAutonomyRunId);
+    });
+  }
+
+  if (btnRejectIntervention) {
+    btnRejectIntervention.addEventListener('click', async () => {
+      if (!activeAutonomyRunId) return;
+      await fetch(`/api/autonomy/${activeAutonomyRunId}/intervene`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approve: false, notes: 'Rejected by user via dashboard' })
+      });
+      await refreshAutonomyState(activeAutonomyRunId);
+    });
+  }
+
 })();

@@ -5,11 +5,13 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Goal representation for an autonomous agent run.
- * Tracks high-level objective and granular, verifiable requirements.
+ * Tracks high-level objective, constraints, and granular, machine-verifiable requirements.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class GameGoal {
@@ -27,11 +29,13 @@ public class GameGoal {
     private String description;
     private GoalStatus status;
     private List<GoalRequirement> requirements;
+    private List<GoalConstraint> constraints;
     private Instant createdAt;
     private Instant updatedAt;
 
     public GameGoal() {
         this.requirements = new ArrayList<>();
+        this.constraints = new ArrayList<>();
         this.status = GoalStatus.ACTIVE;
         this.createdAt = Instant.now();
         this.updatedAt = Instant.now();
@@ -43,8 +47,13 @@ public class GameGoal {
         this.description = description;
         this.status = GoalStatus.ACTIVE;
         this.requirements = new ArrayList<>();
+        this.constraints = new ArrayList<>();
         this.createdAt = Instant.now();
         this.updatedAt = Instant.now();
+    }
+
+    public GameGoal(String goalId, String description) {
+        this(goalId, "default", description);
     }
 
     public String getGoalId() { return goalId; }
@@ -75,16 +84,67 @@ public class GameGoal {
         }
     }
 
+    public List<GoalConstraint> getConstraints() { return constraints; }
+    public void setConstraints(List<GoalConstraint> constraints) {
+        this.constraints = constraints != null ? new ArrayList<>(constraints) : new ArrayList<>();
+        this.updatedAt = Instant.now();
+    }
+
+    public void addConstraint(GoalConstraint constraint) {
+        if (constraint != null) {
+            this.constraints.add(constraint);
+            this.updatedAt = Instant.now();
+        }
+    }
+
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
 
+    public List<GoalRequirement> getRequiredRequirements() {
+        return requirements.stream()
+                .filter(GoalRequirement::isRequired)
+                .collect(Collectors.toList());
+    }
+
+    public List<GoalRequirement> getOptionalRequirements() {
+        return requirements.stream()
+                .filter(r -> !r.isRequired())
+                .collect(Collectors.toList());
+    }
+
     public boolean allRequirementsSatisfied() {
         if (requirements.isEmpty()) {
             return false;
         }
-        return requirements.stream().allMatch(r -> r.getStatus() == GoalRequirement.RequirementStatus.SATISFIED);
+        return requirements.stream().allMatch(r -> r.getStatus() == RequirementStatus.SATISFIED);
+    }
+
+    public boolean allRequiredRequirementsSatisfied() {
+        List<GoalRequirement> required = getRequiredRequirements();
+        if (required.isEmpty()) {
+            return allRequirementsSatisfied();
+        }
+        return required.stream().allMatch(r -> r.getStatus() == RequirementStatus.SATISFIED);
+    }
+
+    public GoalRequirement findRequirement(String requirementId) {
+        if (requirementId == null) return null;
+        return requirements.stream()
+                .filter(r -> Objects.equals(r.getRequirementId(), requirementId))
+                .findFirst()
+                .orElse(null);
+    }
+
+    @Override
+    public String toString() {
+        return "GameGoal{" +
+                "goalId='" + goalId + '\'' +
+                ", desc='" + description + '\'' +
+                ", status=" + status +
+                ", reqs=" + requirements.size() +
+                '}';
     }
 }

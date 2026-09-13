@@ -136,4 +136,42 @@ class ToolRegistryTest {
         List<Map<String, Object>> playTools = registry.getOpenAIToolDefinitions(ToolMode.PLAY_MODE, java.util.EnumSet.of(ToolPermission.SAFE));
         assertEquals(0, playTools.size());
     }
+
+    @Test
+    void testToolMetadataAndGenericPrerequisiteQuery() {
+        Tool scriptTool = new Tool() {
+            @Override public String name() { return "custom_script_tool"; }
+            @Override public String description() { return "Creates custom scripts"; }
+            @Override public String validate(Map<String, Object> parameters) { return null; }
+            @Override public String domain() { return "SCRIPT"; }
+            @Override public List<String> produces() { return List.of("SCRIPT"); }
+            @Override public String validationRequired() { return "COMPILE_SUCCESS"; }
+        };
+
+        Tool playTool = new Tool() {
+            @Override public String name() { return "custom_play_tool"; }
+            @Override public String description() { return "Enters play mode"; }
+            @Override public String validate(Map<String, Object> parameters) { return null; }
+            @Override public String domain() { return "PLAY_MODE"; }
+            @Override public List<String> prerequisites() { return List.of("COMPILE_SUCCESS"); }
+            @Override public List<String> produces() { return List.of("PLAY_MODE"); }
+        };
+
+        ToolRegistry registry = new ToolRegistry(List.of(scriptTool, playTool));
+
+        // Generic query by domain
+        List<Tool> scriptTools = registry.getToolsByDomain("SCRIPT");
+        assertEquals(1, scriptTools.size());
+        assertEquals("custom_script_tool", scriptTools.get(0).name());
+
+        // Generic query by produced artifact
+        List<Tool> producingPlayMode = registry.getToolsProducing("PLAY_MODE");
+        assertEquals(1, producingPlayMode.size());
+        assertEquals("custom_play_tool", producingPlayMode.get(0).name());
+
+        // Generic query by prerequisite
+        List<Tool> requiringCompile = registry.getToolsRequiring("COMPILE_SUCCESS");
+        assertEquals(1, requiringCompile.size());
+        assertEquals("custom_play_tool", requiringCompile.get(0).name());
+    }
 }

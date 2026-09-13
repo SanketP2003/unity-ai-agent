@@ -1,12 +1,13 @@
 package com.unityagent.tools;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
  * Interface for a Unity tool that can be executed via the WebSocket bridge.
  * Each tool has a unique name, description, input schema, parameter validation,
- * execution permissions, and mode constraints.
+ * execution permissions, mode constraints, domain classification, prerequisites, and effects.
  */
 public interface Tool {
 
@@ -57,6 +58,55 @@ public interface Tool {
     }
 
     /**
+     * @return functional domain category (e.g., "SCRIPT", "GAMEOBJECT", "SCENE", "PLAY_MODE", "UI")
+     */
+    default String domain() {
+        return "General";
+    }
+
+    /**
+     * @return operational risk level
+     */
+    default ToolRiskLevel riskLevel() {
+        return isDestructive() ? ToolRiskLevel.HIGH : ToolRiskLevel.LOW;
+    }
+
+    /**
+     * @return true if changes performed by this tool can be easily reverted
+     */
+    default boolean isReversible() {
+        return !isDestructive();
+    }
+
+    /**
+     * @return list of prerequisites required before executing this tool (e.g. "COMPILE_SUCCESS", "PLAY_MODE")
+     */
+    default List<String> prerequisites() {
+        return List.of();
+    }
+
+    /**
+     * @return artifacts, systems, or states produced by this tool (e.g. "SCRIPT", "GAMEOBJECT", "PLAY_MODE")
+     */
+    default List<String> produces() {
+        return List.of();
+    }
+
+    /**
+     * @return entities or components modified by this tool (e.g. "COMPONENT", "TRANSFORM", "SCENE")
+     */
+    default List<String> modifies() {
+        return List.of();
+    }
+
+    /**
+     * @return validation type or condition required after executing this tool (e.g. "COMPILE_SUCCESS")
+     */
+    default String validationRequired() {
+        return null;
+    }
+
+    /**
      * @return JSON Schema describing the input parameters for LLM tool calling
      */
     default Map<String, Object> inputSchema() {
@@ -77,7 +127,14 @@ public interface Tool {
                 permission(),
                 allowedModes(),
                 isDestructive(),
-                timeoutSeconds()
+                timeoutSeconds(),
+                domain(),
+                riskLevel(),
+                isReversible(),
+                prerequisites(),
+                produces(),
+                modifies(),
+                validationRequired()
         );
     }
 }

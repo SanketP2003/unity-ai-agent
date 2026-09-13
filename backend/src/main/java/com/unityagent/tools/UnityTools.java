@@ -254,6 +254,12 @@ public class UnityTools {
         public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
 
         @Override
+        public String domain() { return "GAMEOBJECT"; }
+
+        @Override
+        public List<String> produces() { return List.of("GAMEOBJECT"); }
+
+        @Override
         public Map<String, Object> inputSchema() {
             Map<String, Object> props = new LinkedHashMap<>();
             props.put("type", Map.of(
@@ -1188,6 +1194,10 @@ public class UnityTools {
         }
         @Override public ToolPermission permission() { return ToolPermission.SUPERVISED; }
         @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+        @Override public String domain() { return "SCRIPT"; }
+        @Override public ToolRiskLevel riskLevel() { return ToolRiskLevel.MEDIUM; }
+        @Override public List<String> produces() { return List.of("SCRIPT"); }
+        @Override public String validationRequired() { return "COMPILE_SUCCESS"; }
 
         @Override public Map<String, Object> inputSchema() {
             Map<String, Object> props = new LinkedHashMap<>();
@@ -1217,6 +1227,7 @@ public class UnityTools {
         }
         @Override public ToolPermission permission() { return ToolPermission.SAFE; }
         @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+        @Override public String domain() { return "SCRIPT"; }
 
         @Override public Map<String, Object> inputSchema() {
             return Map.of("type", "object", "properties", Map.of("path", Map.of("type", "string", "description", "Script path in Assets/")), "required", List.of("path"));
@@ -1239,6 +1250,10 @@ public class UnityTools {
         }
         @Override public ToolPermission permission() { return ToolPermission.SUPERVISED; }
         @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+        @Override public String domain() { return "SCRIPT"; }
+        @Override public ToolRiskLevel riskLevel() { return ToolRiskLevel.MEDIUM; }
+        @Override public List<String> modifies() { return List.of("SCRIPT"); }
+        @Override public String validationRequired() { return "COMPILE_SUCCESS"; }
 
         @Override public Map<String, Object> inputSchema() {
             Map<String, Object> props = new LinkedHashMap<>();
@@ -1328,6 +1343,8 @@ public class UnityTools {
         }
         @Override public ToolPermission permission() { return ToolPermission.SAFE; }
         @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+        @Override public String domain() { return "SCRIPT"; }
+        @Override public List<String> produces() { return List.of("COMPILE_SUCCESS"); }
 
         @Override public Map<String, Object> inputSchema() {
             return Map.of("type", "object", "properties", Map.of());
@@ -1344,6 +1361,9 @@ public class UnityTools {
         }
         @Override public ToolPermission permission() { return ToolPermission.SAFE; }
         @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+        @Override public String domain() { return "PLAY_MODE"; }
+        @Override public List<String> prerequisites() { return List.of("COMPILE_SUCCESS"); }
+        @Override public List<String> produces() { return List.of("PLAY_MODE"); }
 
         @Override public Map<String, Object> inputSchema() {
             Map<String, Object> props = new LinkedHashMap<>();
@@ -1362,6 +1382,7 @@ public class UnityTools {
         }
         @Override public ToolPermission permission() { return ToolPermission.SAFE; }
         @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.PLAY_MODE, ToolMode.BOTH); }
+        @Override public String domain() { return "PLAY_MODE"; }
 
         @Override public Map<String, Object> inputSchema() {
             return Map.of("type", "object", "properties", Map.of());
@@ -1378,6 +1399,8 @@ public class UnityTools {
         }
         @Override public ToolPermission permission() { return ToolPermission.SAFE; }
         @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.PLAY_MODE, ToolMode.BOTH); }
+        @Override public String domain() { return "TESTING"; }
+        @Override public List<String> prerequisites() { return List.of("PLAY_MODE"); }
 
         @Override public Map<String, Object> inputSchema() {
             Map<String, Object> props = new LinkedHashMap<>();
