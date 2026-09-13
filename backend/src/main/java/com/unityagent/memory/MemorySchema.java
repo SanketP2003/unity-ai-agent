@@ -9,7 +9,7 @@ public final class MemorySchema {
 
     private MemorySchema() {}
 
-    public static final int CURRENT_VERSION = 2;
+    public static final int CURRENT_VERSION = 3;
 
     // ── Schema versioning ──────────────────────────────────────────────
 
@@ -180,6 +180,107 @@ public final class MemorySchema {
             )
             """;
 
+    // ── Phase 11: Studio Project Metadata (Linked projection) ──────────
+
+    public static final String CREATE_STUDIO_PROJECT_METADATA = """
+            CREATE TABLE IF NOT EXISTS studio_project_metadata (
+                project_id TEXT PRIMARY KEY,
+                description TEXT,
+                tags TEXT,
+                favorite INTEGER DEFAULT 0,
+                target_fps INTEGER DEFAULT 60,
+                active_build_profile TEXT DEFAULT 'Development',
+                created_at TEXT NOT NULL,
+                updated_at TEXT,
+                FOREIGN KEY (project_id) REFERENCES projects(project_id)
+            )
+            """;
+
+    // ── Phase 11: Change Sets & Entries ────────────────────────────────
+
+    public static final String CREATE_CHANGE_SETS = """
+            CREATE TABLE IF NOT EXISTS change_sets (
+                change_set_id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                agent_run_id TEXT,
+                plan_node_id TEXT,
+                summary TEXT,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                reviewed_at TEXT,
+                reviewed_by TEXT,
+                FOREIGN KEY (project_id) REFERENCES projects(project_id)
+            )
+            """;
+
+    public static final String CREATE_CHANGE_ENTRIES = """
+            CREATE TABLE IF NOT EXISTS change_entries (
+                entry_id TEXT PRIMARY KEY,
+                change_set_id TEXT NOT NULL,
+                change_type TEXT NOT NULL,
+                target_path TEXT NOT NULL,
+                before_hash TEXT,
+                after_hash TEXT,
+                diff_content TEXT,
+                risk_level TEXT NOT NULL,
+                approval_state TEXT NOT NULL,
+                rationale TEXT,
+                FOREIGN KEY (change_set_id) REFERENCES change_sets(change_set_id)
+            )
+            """;
+
+    // ── Phase 11: Build Records ────────────────────────────────────────
+
+    public static final String CREATE_BUILD_RECORDS = """
+            CREATE TABLE IF NOT EXISTS build_records (
+                build_id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                platform TEXT NOT NULL,
+                build_target TEXT,
+                configuration TEXT NOT NULL,
+                status TEXT NOT NULL,
+                duration_ms INTEGER DEFAULT 0,
+                output_path TEXT,
+                artifact_size INTEGER DEFAULT 0,
+                errors TEXT,
+                validation_evidence TEXT,
+                created_at TEXT NOT NULL,
+                completed_at TEXT,
+                FOREIGN KEY (project_id) REFERENCES projects(project_id)
+            )
+            """;
+
+    // ── Phase 11: Audit Trail ──────────────────────────────────────────
+
+    public static final String CREATE_AUDIT_EVENTS = """
+            CREATE TABLE IF NOT EXISTS audit_events (
+                event_id TEXT PRIMARY KEY,
+                timestamp TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                project_id TEXT,
+                run_id TEXT,
+                action TEXT NOT NULL,
+                target TEXT,
+                result TEXT NOT NULL,
+                details TEXT
+            )
+            """;
+
+    // ── Phase 11: Studio Notifications ─────────────────────────────────
+
+    public static final String CREATE_STUDIO_NOTIFICATIONS = """
+            CREATE TABLE IF NOT EXISTS studio_notifications (
+                notification_id TEXT PRIMARY KEY,
+                project_id TEXT,
+                run_id TEXT,
+                severity TEXT NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                read INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL
+            )
+            """;
+
     // ── Indexes ────────────────────────────────────────────────────────
 
     public static final String[] CREATE_INDEXES = {
@@ -193,7 +294,13 @@ public final class MemorySchema {
         "CREATE INDEX IF NOT EXISTS idx_runs_project ON autonomous_runs(project_id)",
         "CREATE INDEX IF NOT EXISTS idx_runs_status ON autonomous_runs(status)",
         "CREATE INDEX IF NOT EXISTS idx_events_run_seq ON run_events(agent_run_id, sequence)",
-        "CREATE INDEX IF NOT EXISTS idx_events_project_time ON run_events(project_id, timestamp)"
+        "CREATE INDEX IF NOT EXISTS idx_events_project_time ON run_events(project_id, timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_change_sets_project ON change_sets(project_id)",
+        "CREATE INDEX IF NOT EXISTS idx_change_entries_set ON change_entries(change_set_id)",
+        "CREATE INDEX IF NOT EXISTS idx_build_records_project ON build_records(project_id)",
+        "CREATE INDEX IF NOT EXISTS idx_audit_events_project ON audit_events(project_id)",
+        "CREATE INDEX IF NOT EXISTS idx_audit_events_time ON audit_events(timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_notifications_project ON studio_notifications(project_id)"
     };
 
     /** All table DDL statements in order. */
@@ -207,6 +314,12 @@ public final class MemorySchema {
         CREATE_ARCHITECTURE_SNAPSHOTS,
         CREATE_USER_PREFERENCES,
         CREATE_AUTONOMOUS_RUNS,
-        CREATE_RUN_EVENTS
+        CREATE_RUN_EVENTS,
+        CREATE_STUDIO_PROJECT_METADATA,
+        CREATE_CHANGE_SETS,
+        CREATE_CHANGE_ENTRIES,
+        CREATE_BUILD_RECORDS,
+        CREATE_AUDIT_EVENTS,
+        CREATE_STUDIO_NOTIFICATIONS
     };
 }

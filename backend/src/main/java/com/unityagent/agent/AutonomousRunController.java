@@ -597,4 +597,15 @@ public class AutonomousRunController {
     public AutonomousRunState getRunState(String runId) {
         return activeRuns.get(runId);
     }
+
+    public Map<String, AutonomousRunState> getActiveRuns() {
+        return Collections.unmodifiableMap(activeRuns);
+    }
+
+    public Optional<AutonomousRunState> getActiveRunForProject(String projectId) {
+        if (projectId == null) return Optional.empty();
+        return activeRuns.values().stream()
+                .filter(r -> projectId.equals(r.getProjectId()))
+                .findFirst();
+    }
 }

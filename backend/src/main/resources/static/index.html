@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Autonomous Unity AI Agent — Studio</title>
+  <title>Autonomous Unity Game Studio — Phase 11</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -11,13 +11,22 @@
 </head>
 <body>
   <div class="app-layout">
-    <!-- Header -->
+    <!-- Studio Header / Top Bar -->
     <header class="app-header">
       <div class="brand-section">
         <div class="brand-logo">⚡</div>
         <div class="brand-info">
-          <h1>Autonomous Unity AI Agent</h1>
-          <span class="brand-subtitle">Project-Independent & Model-Agnostic Engine</span>
+          <h1>Autonomous Unity Game Studio</h1>
+          <span class="brand-subtitle">Professional Multi-Project Autonomous Workspace</span>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="project-selector-wrapper">
+          <label for="studio-project-select">Active Project:</label>
+          <select id="studio-project-select" title="Switch active Unity project">
+            <option value="default">Default Project</option>
+          </select>
         </div>
       </div>
 
@@ -41,7 +50,7 @@
           </div>
         </div>
 
-        <button id="btn-toggle-autonomy" class="btn btn-primary" title="Phase 9/10 Long-Horizon Autonomy & Diagnostics">
+        <button id="btn-toggle-autonomy" class="btn btn-primary" title="Toggle Autonomy DAG & Timeline Drawer">
           ⚡ Autonomy DAG
         </button>
 
@@ -57,235 +66,441 @@
       </div>
     </header>
 
-    <!-- Phase 9/10 Autonomy Dashboard / DAG Panel -->
-    <div id="autonomy-panel" class="autonomy-panel hidden">
-      <div class="autonomy-header">
-        <div class="autonomy-title">
-          <span class="autonomy-icon">⚡</span>
-          <h3>Autonomous Engine & Diagnostics</h3>
-          <span id="autonomy-status-badge" class="badge badge-idle">IDLE</span>
-        </div>
-        <div class="autonomy-actions">
-          <button id="btn-autonomy-step" class="btn btn-small btn-primary" disabled>Step Next</button>
-          <button id="btn-autonomy-pause" class="btn btn-small btn-secondary" disabled>Pause</button>
-          <button id="btn-autonomy-resume" class="btn btn-small btn-secondary" disabled>Resume</button>
-          <button id="btn-autonomy-validate" class="btn btn-small btn-secondary">Completion Gate</button>
-          <button id="btn-close-autonomy" class="modal-close-btn">&times;</button>
-        </div>
-      </div>
-
-      <div class="autonomy-body">
-        <div class="autonomy-metrics-strip">
-          <div class="metric-item">
-            <span class="metric-label">Nodes:</span>
-            <span id="metric-nodes" class="metric-val">0/0</span>
-          </div>
-          <div class="metric-item">
-            <span class="metric-label">Tool Calls:</span>
-            <span id="metric-tool-calls" class="metric-val">0</span>
-          </div>
-          <div class="metric-item">
-            <span class="metric-label">Recovery Cycles:</span>
-            <span id="metric-recovery" class="metric-val">0</span>
-          </div>
-          <div class="metric-item">
-            <span class="metric-label">Replans:</span>
-            <span id="metric-replans" class="metric-val">0</span>
-          </div>
-          <div class="metric-item">
-            <span class="metric-label">Checkpoint:</span>
-            <span id="metric-checkpoint" class="metric-val">None</span>
-          </div>
-        </div>
-
-        <div id="intervention-banner" class="intervention-banner hidden">
-          <div class="intervention-content">
-            <strong id="intervention-title">Human Intervention Required:</strong>
-            <span id="intervention-message">Autonomy limit reached</span>
-          </div>
-          <div class="intervention-btns">
-            <button id="btn-approve-intervention" class="btn btn-small btn-success">Approve</button>
-            <button id="btn-reject-intervention" class="btn btn-small btn-danger">Halt</button>
-          </div>
-        </div>
-
-        <div class="autonomy-nav-tabs">
-          <button id="tab-btn-dag" class="tab-nav-btn active">Plan DAG</button>
-          <button id="tab-btn-journal" class="tab-nav-btn">Event Journal (v2)</button>
-          <button id="tab-btn-diagnostics" class="tab-nav-btn">System Metrics</button>
-        </div>
-
-        <div id="tab-content-dag" class="autonomy-tab-content active">
-          <div class="autonomy-dag-container">
-            <div id="autonomy-nodes-list" class="autonomy-nodes-list">
-              <div class="empty-dag-note">No active long-horizon autonomous run. Start a run or enter a full game prompt.</div>
-            </div>
-          </div>
-        </div>
-
-        <div id="tab-content-journal" class="autonomy-tab-content hidden">
-          <div class="autonomy-journal-container">
-            <div id="autonomy-journal-list" class="autonomy-journal-list">
-              <div class="empty-dag-note">No events recorded for active run.</div>
-            </div>
-          </div>
-        </div>
-
-        <div id="tab-content-diagnostics" class="autonomy-tab-content hidden">
-          <div class="autonomy-diagnostics-container">
-            <div class="diag-grid">
-              <div class="diag-card">
-                <span class="diag-card-title">Total Runs</span>
-                <span id="diag-total-runs" class="diag-card-val">0</span>
-              </div>
-              <div class="diag-card">
-                <span class="diag-card-title">Active Runs</span>
-                <span id="diag-active-runs" class="diag-card-val">0</span>
-              </div>
-              <div class="diag-card">
-                <span class="diag-card-title">Success Rate</span>
-                <span id="diag-success-rate" class="diag-card-val">100%</span>
-              </div>
-              <div class="diag-card">
-                <span class="diag-card-title">Recovery Cycles</span>
-                <span id="diag-recoveries" class="diag-card-val">0</span>
-              </div>
-              <div class="diag-card">
-                <span class="diag-card-title">Unity Disconnects</span>
-                <span id="diag-disconnects" class="diag-card-val">0</span>
-              </div>
-              <div class="diag-card">
-                <span class="diag-card-title">Circuit Breaker Trips</span>
-                <span id="diag-breaker-trips" class="diag-card-val">0</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Goal & Agent State Banner -->
-    <div id="goal-banner" class="goal-banner hidden">
-      <div class="goal-info">
-        <span class="goal-label">GOAL</span>
-        <span id="goal-description" class="goal-text">Constructing game scene...</span>
-      </div>
-      <div class="agent-state-badge" id="agent-state-badge">IDLE</div>
-      <div class="plan-step-info" id="plan-step-info">
-        <span class="plan-step-label">PLAN STEP:</span>
-        <span id="current-plan-step" class="plan-step-text">None</span>
-      </div>
-    </div>
-
-    <!-- Autonomous Pipeline Stage Banner (7 Stages) -->
-    <div id="pipeline-banner" class="pipeline-banner hidden">
-      <div class="pipeline-step" data-step="PLANNING">
-        <span class="step-dot"></span>
-        <span class="step-name">Planning</span>
-      </div>
-      <div class="pipeline-connector"></div>
-      <div class="pipeline-step" data-step="BUILDING">
-        <span class="step-dot"></span>
-        <span class="step-name">Building</span>
-      </div>
-      <div class="pipeline-connector"></div>
-      <div class="pipeline-step" data-step="COMPILING">
-        <span class="step-dot"></span>
-        <span class="step-name">Compiling</span>
-      </div>
-      <div class="pipeline-connector"></div>
-      <div class="pipeline-step" data-step="DIAGNOSING">
-        <span class="step-dot"></span>
-        <span class="step-name">Diagnosing</span>
-      </div>
-      <div class="pipeline-connector"></div>
-      <div class="pipeline-step" data-step="REPAIRING">
-        <span class="step-dot"></span>
-        <span class="step-name">Repairing</span>
-      </div>
-      <div class="pipeline-connector"></div>
-      <div class="pipeline-step" data-step="TESTING">
-        <span class="step-dot"></span>
-        <span class="step-name">Testing</span>
-      </div>
-      <div class="pipeline-connector"></div>
-      <div class="pipeline-step" data-step="VALIDATING">
-        <span class="step-dot"></span>
-        <span class="step-name">Validating</span>
-      </div>
-    </div>
-
-    <!-- Diagnostic Results Bar -->
-    <div id="results-bar" class="results-bar hidden">
-      <div class="result-card" id="res-compilation">
-        <span class="result-title">Compilation:</span>
-        <span class="result-value" id="val-compilation">CLEAN</span>
-      </div>
-      <div class="result-card" id="res-runtime">
-        <span class="result-title">Runtime Test:</span>
-        <span class="result-value" id="val-runtime">CLEAN</span>
-      </div>
-      <div class="result-card" id="res-validation">
-        <span class="result-title">Objective Validation:</span>
-        <span class="result-value" id="val-validation">PENDING</span>
-      </div>
-    </div>
-
-    <!-- Main Content Area -->
-    <main class="chat-container">
-      <div id="chat-messages" class="chat-stream">
-        <!-- Messages & Tool Execution Cards -->
-        <div class="welcome-card" id="welcome-card">
-          <div class="welcome-icon">🎮</div>
-          <h2>Autonomous Unity Development Agent</h2>
-          <p>Model-agnostic AI agent operating via WebSocket Protocol v1.0. Executes autonomous planning, scene construction, script generation, compile error repair, and runtime validation.</p>
-          <div class="quick-prompts">
-            <button class="prompt-chip" data-prompt="Create a small Unity scene with a blue ground plane and a red sphere above it.">
-              🟦 Blue ground & red sphere
-            </button>
-            <button class="prompt-chip" data-prompt="Inspect the current Unity project info and summarize active scene, components, and compiler state.">
-              🔍 Get project info & inspect
-            </button>
-            <button class="prompt-chip" data-prompt="Build me a small playable 3D platform game with a player, ground, platforms, enemies, goal, camera, lighting, and movement.">
-              🚀 Build complete 3D platformer game
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Live Agent Activity Banner -->
-      <div id="agent-activity-banner" class="agent-activity-banner hidden">
-        <div class="spinner"></div>
-        <span id="agent-activity-text" class="activity-text">Thinking...</span>
-        <span id="agent-run-badge" class="activity-run-id"></span>
-      </div>
-    </main>
-
-    <!-- Footer / Input Bar -->
-    <footer class="input-container">
-      <div class="input-wrapper">
-        <textarea
-          id="user-prompt"
-          rows="1"
-          placeholder="Describe what you want to build or test in Unity... (Shift+Enter for new line)"
-          autofocus
-        ></textarea>
-        <div class="input-actions">
-          <button id="btn-cancel" class="btn btn-danger hidden" title="Cancel the currently active agent run">
-            Cancel Run
+    <!-- Studio Body: Sidebar Navigation + Dynamic Viewports -->
+    <div class="studio-workspace-container">
+      <!-- Sidebar Navigation -->
+      <aside class="studio-sidebar">
+        <nav class="studio-nav">
+          <button class="nav-item active" data-view="view-workspace" id="nav-workspace" title="Autonomous Workspace & Chat">
+            <span class="nav-icon">⚡</span>
+            <span class="nav-text">Workspace</span>
           </button>
-          <button id="btn-send" class="btn btn-primary">
-            <span>Send</span>
-            <svg class="send-icon" viewBox="0 0 24 24" width="16" height="16">
-              <path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-            </svg>
+          <button class="nav-item" data-view="view-projects" id="nav-projects" title="Project Dashboard & Activity">
+            <span class="nav-icon">📁</span>
+            <span class="nav-text">Projects</span>
           </button>
+          <button class="nav-item" data-view="view-scene" id="nav-scene" title="Live Scene Explorer & Inspector">
+            <span class="nav-icon">🏛️</span>
+            <span class="nav-text">Scene</span>
+          </button>
+          <button class="nav-item" data-view="view-scripts" id="nav-scripts" title="Script Explorer & Diff Viewer">
+            <span class="nav-icon">📝</span>
+            <span class="nav-text">Scripts</span>
+          </button>
+          <button class="nav-item" data-view="view-assets" id="nav-assets" title="Asset Explorer">
+            <span class="nav-icon">📦</span>
+            <span class="nav-text">Assets</span>
+          </button>
+          <button class="nav-item" data-view="view-changes" id="nav-changes" title="Change Review & Human Approval Boundary">
+            <span class="nav-icon">🛡️</span>
+            <span class="nav-text">Changes</span>
+            <span id="pending-changes-badge" class="nav-badge hidden">0</span>
+          </button>
+          <button class="nav-item" data-view="view-builds" id="nav-builds" title="Build & Export Management">
+            <span class="nav-icon">🚀</span>
+            <span class="nav-text">Builds</span>
+          </button>
+          <button class="nav-item" data-view="view-diagnostics" id="nav-diagnostics" title="Centralized Diagnostics & Audit Trail">
+            <span class="nav-icon">📊</span>
+            <span class="nav-text">Diagnostics</span>
+          </button>
+        </nav>
+      </aside>
+
+      <!-- Main View Container -->
+      <div class="studio-main-content">
+        <!-- ── VIEW 1: Workspace & Autonomous Run (Default) ───────────── -->
+        <div id="view-workspace" class="studio-view active">
+          <!-- Autonomy Drawer / DAG Panel -->
+          <div id="autonomy-panel" class="autonomy-panel hidden">
+            <div class="autonomy-header">
+              <div class="autonomy-title">
+                <span class="autonomy-icon">⚡</span>
+                <h3>Autonomous Engine & Diagnostics</h3>
+                <span id="autonomy-status-badge" class="badge badge-idle">IDLE</span>
+              </div>
+              <div class="autonomy-actions">
+                <button id="btn-autonomy-step" class="btn btn-small btn-primary" disabled>Step Next</button>
+                <button id="btn-autonomy-pause" class="btn btn-small btn-secondary" disabled>Pause</button>
+                <button id="btn-autonomy-resume" class="btn btn-small btn-secondary" disabled>Resume</button>
+                <button id="btn-autonomy-validate" class="btn btn-small btn-secondary">Completion Gate</button>
+                <button id="btn-close-autonomy" class="modal-close-btn">&times;</button>
+              </div>
+            </div>
+
+            <div class="autonomy-body">
+              <div class="autonomy-metrics-strip">
+                <div class="metric-item">
+                  <span class="metric-label">Nodes:</span>
+                  <span id="metric-nodes" class="metric-val">0/0</span>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Tool Calls:</span>
+                  <span id="metric-tool-calls" class="metric-val">0</span>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Recovery Cycles:</span>
+                  <span id="metric-recovery" class="metric-val">0</span>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Replans:</span>
+                  <span id="metric-replans" class="metric-val">0</span>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Checkpoint:</span>
+                  <span id="metric-checkpoint" class="metric-val">None</span>
+                </div>
+              </div>
+
+              <div id="intervention-banner" class="intervention-banner hidden">
+                <div class="intervention-content">
+                  <strong id="intervention-title">Human Intervention Required:</strong>
+                  <span id="intervention-message">Autonomy limit reached</span>
+                </div>
+                <div class="intervention-btns">
+                  <button id="btn-approve-intervention" class="btn btn-small btn-success">Approve</button>
+                  <button id="btn-reject-intervention" class="btn btn-small btn-danger">Halt</button>
+                </div>
+              </div>
+
+              <div class="autonomy-nav-tabs">
+                <button id="tab-btn-dag" class="tab-nav-btn active">Plan DAG</button>
+                <button id="tab-btn-journal" class="tab-nav-btn">Event Journal</button>
+                <button id="tab-btn-diagnostics" class="tab-nav-btn">System Metrics</button>
+              </div>
+
+              <div id="tab-content-dag" class="autonomy-tab-content active">
+                <div class="autonomy-dag-container">
+                  <div id="autonomy-nodes-list" class="autonomy-nodes-list">
+                    <div class="empty-dag-note">No active long-horizon autonomous run. Start a run or enter a full game prompt.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="tab-content-journal" class="autonomy-tab-content hidden">
+                <div class="autonomy-journal-container">
+                  <div id="autonomy-journal-list" class="autonomy-journal-list">
+                    <div class="empty-dag-note">No events recorded for active run.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="tab-content-diagnostics" class="autonomy-tab-content hidden">
+                <div class="autonomy-diagnostics-container">
+                  <div class="diag-grid">
+                    <div class="diag-card">
+                      <span class="diag-card-title">Total Runs</span>
+                      <span id="diag-total-runs" class="diag-card-val">0</span>
+                    </div>
+                    <div class="diag-card">
+                      <span class="diag-card-title">Active Runs</span>
+                      <span id="diag-active-runs" class="diag-card-val">0</span>
+                    </div>
+                    <div class="diag-card">
+                      <span class="diag-card-title">Success Rate</span>
+                      <span id="diag-success-rate" class="diag-card-val">100%</span>
+                    </div>
+                    <div class="diag-card">
+                      <span class="diag-card-title">Recovery Cycles</span>
+                      <span id="diag-recoveries" class="diag-card-val">0</span>
+                    </div>
+                    <div class="diag-card">
+                      <span class="diag-card-title">Unity Disconnects</span>
+                      <span id="diag-disconnects" class="diag-card-val">0</span>
+                    </div>
+                    <div class="diag-card">
+                      <span class="diag-card-title">Circuit Breaker Trips</span>
+                      <span id="diag-breaker-trips" class="diag-card-val">0</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Goal & Agent State Banner -->
+          <div id="goal-banner" class="goal-banner hidden">
+            <div class="goal-info">
+              <span class="goal-label">GOAL</span>
+              <span id="goal-description" class="goal-text">Constructing game scene...</span>
+            </div>
+            <div class="agent-state-badge" id="agent-state-badge">IDLE</div>
+            <div class="plan-step-info" id="plan-step-info">
+              <span class="plan-step-label">PLAN STEP:</span>
+              <span id="current-plan-step" class="plan-step-text">None</span>
+            </div>
+          </div>
+
+          <!-- Autonomous Pipeline Stage Banner -->
+          <div id="pipeline-banner" class="pipeline-banner hidden">
+            <div class="pipeline-step" data-step="PLANNING"><span class="step-dot"></span><span class="step-name">Planning</span></div>
+            <div class="pipeline-connector"></div>
+            <div class="pipeline-step" data-step="BUILDING"><span class="step-dot"></span><span class="step-name">Building</span></div>
+            <div class="pipeline-connector"></div>
+            <div class="pipeline-step" data-step="COMPILING"><span class="step-dot"></span><span class="step-name">Compiling</span></div>
+            <div class="pipeline-connector"></div>
+            <div class="pipeline-step" data-step="DIAGNOSING"><span class="step-dot"></span><span class="step-name">Diagnosing</span></div>
+            <div class="pipeline-connector"></div>
+            <div class="pipeline-step" data-step="REPAIRING"><span class="step-dot"></span><span class="step-name">Repairing</span></div>
+            <div class="pipeline-connector"></div>
+            <div class="pipeline-step" data-step="TESTING"><span class="step-dot"></span><span class="step-name">Testing</span></div>
+            <div class="pipeline-connector"></div>
+            <div class="pipeline-step" data-step="VALIDATING"><span class="step-dot"></span><span class="step-name">Validating</span></div>
+          </div>
+
+          <!-- Diagnostic Results Bar -->
+          <div id="results-bar" class="results-bar hidden">
+            <div class="result-card" id="res-compilation"><span class="result-title">Compilation:</span><span class="result-value" id="val-compilation">CLEAN</span></div>
+            <div class="result-card" id="res-runtime"><span class="result-title">Runtime Test:</span><span class="result-value" id="val-runtime">CLEAN</span></div>
+            <div class="result-card" id="res-validation"><span class="result-title">Objective Validation:</span><span class="result-value" id="val-validation">PENDING</span></div>
+          </div>
+
+          <!-- Chat Stream & Activity -->
+          <main class="chat-container">
+            <div id="chat-messages" class="chat-stream">
+              <div class="welcome-card" id="welcome-card">
+                <div class="welcome-icon">🎮</div>
+                <h2>Autonomous Unity Game Studio</h2>
+                <p>Model-agnostic AI agent operating via WebSocket Protocol v1.0. Complete workspace navigation with live scene inspection, scripts diff viewer, change review, builds, and 4-gate safe rollback.</p>
+                <div class="quick-prompts">
+                  <button class="prompt-chip" data-prompt="Create a small Unity scene with a blue ground plane and a red sphere above it.">🟦 Blue ground & red sphere</button>
+                  <button class="prompt-chip" data-prompt="Inspect the current Unity project info and summarize active scene, components, and compiler state.">🔍 Get project info & inspect</button>
+                  <button class="prompt-chip" data-prompt="Build me a small playable 3D platform game with a player, ground, platforms, enemies, goal, camera, lighting, and movement.">🚀 Build complete 3D platformer game</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="agent-activity-banner" class="agent-activity-banner hidden">
+              <div class="spinner"></div>
+              <span id="agent-activity-text" class="activity-text">Thinking...</span>
+              <span id="agent-run-badge" class="activity-run-id"></span>
+            </div>
+          </main>
+
+          <!-- Input Footer -->
+          <footer class="input-container">
+            <div class="input-wrapper">
+              <textarea id="user-prompt" rows="1" placeholder="Describe what you want to build or test in Unity... (Shift+Enter for new line)" autofocus></textarea>
+              <div class="input-actions">
+                <button id="btn-cancel" class="btn btn-danger hidden" title="Cancel active agent run">Cancel Run</button>
+                <button id="btn-send" class="btn btn-primary">
+                  <span>Send</span>
+                  <svg class="send-icon" viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="input-footer-note">
+              Agent executes live actions on Unity via Protocol v1.0. Single tool loop, objective CompletionGate, and human approval boundaries active.
+            </div>
+          </footer>
         </div>
+
+        <!-- ── VIEW 2: Projects Dashboard ─────────────────────────────── -->
+        <div id="view-projects" class="studio-view hidden">
+          <div class="view-header">
+            <h2>Project Dashboard</h2>
+            <div class="view-actions">
+              <button id="btn-refresh-projects" class="btn btn-secondary">🔄 Refresh</button>
+            </div>
+          </div>
+          <div class="projects-dashboard-layout">
+            <div class="projects-list-section">
+              <h3>Registered Projects</h3>
+              <div id="projects-cards-container" class="projects-grid">
+                <!-- Dynamically loaded -->
+              </div>
+            </div>
+            <div class="projects-activity-section">
+              <h3>Recent Project Activity</h3>
+              <div id="projects-activity-stream" class="activity-stream">
+                <!-- Dynamically loaded -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── VIEW 3: Scene Explorer ─────────────────────────────────── -->
+        <div id="view-scene" class="studio-view hidden">
+          <div class="view-header">
+            <h2>Scene Explorer</h2>
+            <div class="view-actions">
+              <button id="btn-refresh-scene" class="btn btn-secondary">🔄 Refresh Live Scene</button>
+            </div>
+          </div>
+          <div class="explorer-layout">
+            <div class="explorer-tree-pane">
+              <h3>Hierarchy</h3>
+              <div id="scene-tree-container" class="tree-container">
+                <!-- Dynamically loaded -->
+              </div>
+            </div>
+            <div class="explorer-detail-pane">
+              <h3>Component Inspector</h3>
+              <div id="scene-inspector-container" class="inspector-container">
+                <div class="empty-note">Select a GameObject to inspect its components and properties.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── VIEW 4: Script Explorer & Diff Viewer ──────────────────── -->
+        <div id="view-scripts" class="studio-view hidden">
+          <div class="view-header">
+            <h2>Script Explorer & Diffs</h2>
+            <div class="view-actions">
+              <button id="btn-refresh-scripts" class="btn btn-secondary">🔄 Refresh Scripts</button>
+            </div>
+          </div>
+          <div class="explorer-layout">
+            <div class="explorer-tree-pane">
+              <h3>Project Scripts</h3>
+              <div id="scripts-list-container" class="tree-container">
+                <!-- Dynamically loaded -->
+              </div>
+            </div>
+            <div class="explorer-detail-pane">
+              <div class="diff-header-bar">
+                <h3 id="script-diff-title">Diff Preview</h3>
+              </div>
+              <div id="script-diff-view" class="diff-view-container">
+                <div class="empty-note">Select a script to view modifications or unified diffs.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── VIEW 5: Asset Explorer ─────────────────────────────────── -->
+        <div id="view-assets" class="studio-view hidden">
+          <div class="view-header">
+            <h2>Asset Explorer</h2>
+            <div class="view-actions">
+              <div class="filter-chips" id="asset-category-chips">
+                <button class="chip active" data-cat="">All</button>
+                <button class="chip" data-cat="Prefab">Prefabs</button>
+                <button class="chip" data-cat="Material">Materials</button>
+                <button class="chip" data-cat="Audio">Audio</button>
+                <button class="chip" data-cat="Model">Models</button>
+                <button class="chip" data-cat="Texture">Textures</button>
+              </div>
+              <button id="btn-refresh-assets" class="btn btn-secondary">🔄 Refresh</button>
+            </div>
+          </div>
+          <div id="assets-grid-container" class="assets-grid">
+            <!-- Dynamically loaded -->
+          </div>
+        </div>
+
+        <!-- ── VIEW 6: Change Review & Approvals ──────────────────────── -->
+        <div id="view-changes" class="studio-view hidden">
+          <div class="view-header">
+            <h2>Change Review & Approvals</h2>
+            <div class="view-actions">
+              <button id="btn-refresh-changes" class="btn btn-secondary">🔄 Refresh</button>
+            </div>
+          </div>
+          <div class="changes-review-layout">
+            <p class="section-desc">
+              All modifications to critical scene files (.unity), native plugins, project settings, or file deletions require human review.
+              Automated agents and LLMs are strictly prohibited from self-approving high-risk changes.
+            </p>
+            <div id="changes-list-container" class="changes-list">
+              <!-- Dynamically loaded -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ── VIEW 7: Build Center ───────────────────────────────────── -->
+        <div id="view-builds" class="studio-view hidden">
+          <div class="view-header">
+            <h2>Build & Export Center</h2>
+          </div>
+          <div class="build-center-layout">
+            <div class="build-trigger-card">
+              <h3>Start Project Build</h3>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="build-platform">Platform Target:</label>
+                  <select id="build-platform">
+                    <option value="StandaloneWindows64">Windows (64-bit)</option>
+                    <option value="WebGL">WebGL</option>
+                    <option value="Android">Android</option>
+                    <option value="iOS">iOS</option>
+                    <option value="StandaloneOSX">macOS</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="build-config">Configuration:</label>
+                  <select id="build-config">
+                    <option value="Release">Release</option>
+                    <option value="Debug">Debug (Development Build)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="build-output-path">Output Relative Path:</label>
+                  <input type="text" id="build-output-path" value="Builds/Windows/Game.exe" />
+                </div>
+              </div>
+              <button id="btn-start-build" class="btn btn-primary">🚀 Trigger Build</button>
+            </div>
+
+            <div class="builds-history-section">
+              <h3>Build History & Evidence Validation</h3>
+              <div id="builds-history-container" class="builds-history-list">
+                <!-- Dynamically loaded -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── VIEW 8: Diagnostics & Audit ────────────────────────────── -->
+        <div id="view-diagnostics" class="studio-view hidden">
+          <div class="view-header">
+            <h2>Centralized Diagnostics & Audit Trail</h2>
+            <div class="view-actions">
+              <button id="btn-refresh-diagnostics" class="btn btn-secondary">🔄 Refresh</button>
+            </div>
+          </div>
+          <div class="diagnostics-filters-bar">
+            <div class="filter-group">
+              <label>Category:</label>
+              <select id="diag-filter-category">
+                <option value="">All Categories</option>
+                <option value="COMPILATION">Compilation</option>
+                <option value="RUNTIME">Runtime</option>
+                <option value="UNITY">Unity Bridge</option>
+                <option value="PROVIDER">AI Provider</option>
+                <option value="TOOLS">Tool Execution</option>
+                <option value="RECOVERY">Recovery</option>
+                <option value="VALIDATION">Validation</option>
+                <option value="SECURITY">Security</option>
+                <option value="BUILD">Builds</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>Severity:</label>
+              <select id="diag-filter-severity">
+                <option value="">All Severities</option>
+                <option value="INFO">INFO</option>
+                <option value="WARN">WARN</option>
+                <option value="ERROR">ERROR</option>
+                <option value="CRITICAL">CRITICAL</option>
+              </select>
+            </div>
+            <div class="filter-group flex-1">
+              <label>Search:</label>
+              <input type="text" id="diag-search-input" placeholder="Search diagnostics..." />
+            </div>
+          </div>
+
+          <div class="diagnostics-container">
+            <div id="diagnostics-stream-container" class="diagnostics-stream">
+              <!-- Dynamically loaded -->
+            </div>
+          </div>
+        </div>
+
       </div>
-      <div class="input-footer-note">
-        Agent executes live actions on Unity 6 via Protocol v1.0. Dynamic planning & compile recovery enabled.
-      </div>
-    </footer>
+    </div>
   </div>
 
   <!-- Settings Modal -->

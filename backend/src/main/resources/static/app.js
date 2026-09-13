@@ -68,6 +68,7 @@
     loadSessionHistory(currentSessionId);
     loadProviderConfig();
     restoreActiveAutonomyRun();
+    initStudio();
   }
 
   function setupEventListeners() {
@@ -1233,4 +1234,801 @@
     });
   }
 
+  // =========================================================================
+  // Phase 11 — Professional Autonomous Game Studio Workspace Logic
+  // =========================================================================
+
+  let activeStudioProjectId = localStorage.getItem('studio_active_project') || 'default';
+  let activeStudioView = 'view-workspace';
+  let activeAssetCategory = '';
+  let activeSelectedGameObject = null;
+  let activeSelectedScript = null;
+
+  function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function initStudio() {
+    setupStudioNavigation();
+    setupStudioProjectSelector();
+    setupStudioRefreshButtons();
+    setupStudioBuilds();
+    setupStudioAssetFilter();
+    setupStudioDiagnosticsFilters();
+
+    // Initial load
+    loadStudioProjects();
+    checkPendingChangesCount(activeStudioProjectId);
+    setInterval(() => checkPendingChangesCount(activeStudioProjectId), 10000);
+  }
+
+  // 1. Sidebar Navigation Switcher
+  function setupStudioNavigation() {
+    const navButtons = document.querySelectorAll('.studio-sidebar .nav-item');
+    navButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetViewId = btn.getAttribute('data-view');
+        if (!targetViewId) return;
+        switchStudioView(targetViewId, btn);
+      });
+    });
+  }
+
+  function switchStudioView(viewId, clickedBtn) {
+    activeStudioView = viewId;
+
+    // Update nav active state
+    document.querySelectorAll('.studio-sidebar .nav-item').forEach(b => b.classList.remove('active'));
+    if (clickedBtn) {
+      clickedBtn.classList.add('active');
+    } else {
+      const match = document.querySelector(`.studio-sidebar .nav-item[data-view="${viewId}"]`);
+      if (match) match.classList.add('active');
+    }
+
+    // Toggle view containers
+    document.querySelectorAll('.studio-view').forEach(view => {
+      if (view.id === viewId) {
+        view.classList.remove('hidden');
+        view.classList.add('active');
+      } else {
+        view.classList.add('hidden');
+        view.classList.remove('active');
+      }
+    });
+
+    // Dispatch view-specific data loading
+    switch (viewId) {
+      case 'view-projects':
+        loadStudioProjects();
+        loadProjectActivity(activeStudioProjectId);
+        break;
+      case 'view-scene':
+        loadLiveScene(activeStudioProjectId);
+        break;
+      case 'view-scripts':
+        loadProjectScripts(activeStudioProjectId);
+        break;
+      case 'view-assets':
+        loadProjectAssets(activeStudioProjectId, activeAssetCategory);
+        break;
+      case 'view-changes':
+        loadPendingChanges(activeStudioProjectId);
+        break;
+      case 'view-builds':
+        loadBuildHistory(activeStudioProjectId);
+        break;
+      case 'view-diagnostics':
+        loadStudioDiagnostics();
+        break;
+      default:
+        break;
+    }
+  }
+
+  // 2. Project Selector Dropdown
+  function setupStudioProjectSelector() {
+    const select = document.getElementById('studio-project-select');
+    if (!select) return;
+
+    select.addEventListener('change', () => {
+      activeStudioProjectId = select.value;
+      localStorage.setItem('studio_active_project', activeStudioProjectId);
+      checkPendingChangesCount(activeStudioProjectId);
+
+      // Refresh whatever view is currently visible
+      switchStudioView(activeStudioView);
+    });
+  }
+
+  // 3. Refresh Buttons Wiring
+  function setupStudioRefreshButtons() {
+    const btnRefProjects = document.getElementById('btn-refresh-projects');
+    if (btnRefProjects) {
+      btnRefProjects.addEventListener('click', () => {
+        loadStudioProjects();
+        loadProjectActivity(activeStudioProjectId);
+      });
+    }
+
+    const btnRefScene = document.getElementById('btn-refresh-scene');
+    if (btnRefScene) {
+      btnRefScene.addEventListener('click', () => loadLiveScene(activeStudioProjectId));
+    }
+
+    const btnRefScripts = document.getElementById('btn-refresh-scripts');
+    if (btnRefScripts) {
+      btnRefScripts.addEventListener('click', () => loadProjectScripts(activeStudioProjectId));
+    }
+
+    const btnRefAssets = document.getElementById('btn-refresh-assets');
+    if (btnRefAssets) {
+      btnRefAssets.addEventListener('click', () => loadProjectAssets(activeStudioProjectId, activeAssetCategory));
+    }
+
+    const btnRefChanges = document.getElementById('btn-refresh-changes');
+    if (btnRefChanges) {
+      btnRefChanges.addEventListener('click', () => loadPendingChanges(activeStudioProjectId));
+    }
+
+    const btnRefDiag = document.getElementById('btn-refresh-diagnostics');
+    if (btnRefDiag) {
+      btnRefDiag.addEventListener('click', () => loadStudioDiagnostics());
+    }
+  }
+
+  // ── View 2: Projects Dashboard ──────────────────────────────────────────
+  async function loadStudioProjects() {
+    const container = document.getElementById('projects-cards-container');
+    const select = document.getElementById('studio-project-select');
+    if (!container) return;
+
+    try {
+      const res = await fetch('/api/studio/projects');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const projects = await res.json();
+
+      // Update selector
+      if (select) {
+        select.innerHTML = '';
+        projects.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.projectId;
+          opt.textContent = `${p.name || p.projectId} (${p.status || 'ACTIVE'})`;
+          if (p.projectId === activeStudioProjectId) opt.selected = true;
+          select.appendChild(opt);
+        });
+        if (!projects.some(p => p.projectId === activeStudioProjectId) && projects.length > 0) {
+          activeStudioProjectId = projects[0].projectId;
+          select.value = activeStudioProjectId;
+        }
+      }
+
+      // Render cards
+      container.innerHTML = '';
+      if (projects.length === 0) {
+        container.innerHTML = '<div class="empty-note">No registered projects found.</div>';
+        return;
+      }
+
+      projects.forEach(p => {
+        const card = document.createElement('div');
+        const isActive = p.projectId === activeStudioProjectId;
+        card.className = `project-card ${isActive ? 'active-project' : ''}`;
+        const lastActive = p.lastActiveAt ? new Date(p.lastActiveAt).toLocaleString() : 'Never';
+        card.innerHTML = `
+          <div class="project-card-header">
+            <h4 class="project-title">${escapeHtml(p.name || p.projectId)}</h4>
+            <span class="status-pill status-${(p.status || 'ACTIVE').toLowerCase() === 'active' ? 'online' : 'checking'}">
+              ${escapeHtml(p.status || 'ACTIVE')}
+            </span>
+          </div>
+          <div class="project-card-body">
+            <p class="project-path" title="${escapeHtml(p.projectPath || '')}">${escapeHtml(p.projectPath || 'No local path configured')}</p>
+            <div class="project-meta-row">
+              <span><strong>Unity:</strong> ${escapeHtml(p.unityVersion || '2022.3 LTS')}</span>
+              <span><strong>Last Active:</strong> ${escapeHtml(lastActive)}</span>
+            </div>
+          </div>
+          <div class="project-card-actions">
+            <button class="btn btn-small btn-primary btn-select-proj" data-proj="${escapeHtml(p.projectId)}">
+              ${isActive ? 'Active Project' : 'Select Project'}
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      container.querySelectorAll('.btn-select-proj').forEach(b => {
+        b.addEventListener('click', (e) => {
+          const pid = e.currentTarget.getAttribute('data-proj');
+          if (pid) {
+            activeStudioProjectId = pid;
+            localStorage.setItem('studio_active_project', pid);
+            if (select) select.value = pid;
+            loadStudioProjects();
+            loadProjectActivity(pid);
+            checkPendingChangesCount(pid);
+          }
+        });
+      });
+    } catch (err) {
+      console.warn('Failed to load projects:', err);
+      container.innerHTML = `<div class="error-note">Failed to load projects: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function loadProjectActivity(projectId) {
+    const container = document.getElementById('projects-activity-stream');
+    if (!container || !projectId) return;
+
+    try {
+      const res = await fetch(`/api/studio/projects/${encodeURIComponent(projectId)}/activity?limit=30`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const activities = await res.json();
+
+      container.innerHTML = '';
+      if (!activities || activities.length === 0) {
+        container.innerHTML = '<div class="empty-note">No recent activity recorded for this project.</div>';
+        return;
+      }
+
+      activities.forEach(act => {
+        const item = document.createElement('div');
+        item.className = 'activity-item';
+        const timeStr = act.timestamp ? new Date(act.timestamp).toLocaleTimeString() : '';
+        item.innerHTML = `
+          <span class="activity-time">${escapeHtml(timeStr)}</span>
+          <span class="activity-type-badge">${escapeHtml(act.activityType || 'ACTION')}</span>
+          <span class="activity-desc">${escapeHtml(act.summary || '')}</span>
+        `;
+        container.appendChild(item);
+      });
+    } catch (e) {
+      container.innerHTML = `<div class="error-note">Failed to load activity stream: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  // ── View 3: Scene Explorer & Inspector ──────────────────────────────────
+  async function loadLiveScene(projectId) {
+    const treeContainer = document.getElementById('scene-tree-container');
+    const inspector = document.getElementById('scene-inspector-container');
+    if (!treeContainer || !projectId) return;
+
+    treeContainer.innerHTML = '<div class="spinner-small"></div> Fetching live scene...';
+    try {
+      const res = await fetch(`/api/studio/projects/${encodeURIComponent(projectId)}/scene`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      treeContainer.innerHTML = '';
+      const objects = data.objects || (Array.isArray(data) ? data : []);
+      if (objects.length === 0) {
+        treeContainer.innerHTML = '<div class="empty-note">No GameObjects found in active scene.</div>';
+        if (inspector) inspector.innerHTML = '<div class="empty-note">Select a GameObject to inspect.</div>';
+        return;
+      }
+
+      objects.forEach((obj, idx) => {
+        const item = document.createElement('div');
+        item.className = `tree-item ${activeSelectedGameObject && activeSelectedGameObject.name === obj.name ? 'selected' : ''}`;
+        const hasChildren = obj.children && obj.children.length > 0;
+        item.innerHTML = `
+          <div class="tree-label">
+            <span class="tree-icon">${hasChildren ? '📁' : '🔷'}</span>
+            <span class="tree-name">${escapeHtml(obj.name || 'GameObject')}</span>
+            <span class="tree-tag-badge">${escapeHtml(obj.tag || 'Untagged')}</span>
+          </div>
+        `;
+        item.addEventListener('click', () => {
+          activeSelectedGameObject = obj;
+          treeContainer.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected'));
+          item.classList.add('selected');
+          renderComponentInspector(obj);
+        });
+        treeContainer.appendChild(item);
+      });
+
+      // Default inspect first object if none selected
+      if (!activeSelectedGameObject && objects.length > 0) {
+        activeSelectedGameObject = objects[0];
+        const first = treeContainer.querySelector('.tree-item');
+        if (first) first.classList.add('selected');
+        renderComponentInspector(objects[0]);
+      }
+    } catch (err) {
+      treeContainer.innerHTML = `<div class="error-note">Scene fetch failed: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  function renderComponentInspector(obj) {
+    const inspector = document.getElementById('scene-inspector-container');
+    if (!inspector || !obj) return;
+
+    const components = obj.components || ['Transform', 'MeshFilter', 'MeshRenderer'];
+    const transform = obj.transform || { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
+
+    inspector.innerHTML = `
+      <div class="inspector-header">
+        <h4 class="obj-name">${escapeHtml(obj.name || 'GameObject')}</h4>
+        <div class="obj-flags">
+          <label><input type="checkbox" ${obj.active !== false ? 'checked' : ''} disabled> Active</label>
+          <span class="obj-tag">Tag: <strong>${escapeHtml(obj.tag || 'Untagged')}</strong></span>
+          <span class="obj-layer">Layer: <strong>${escapeHtml(obj.layer || 'Default')}</strong></span>
+        </div>
+      </div>
+      <div class="inspector-card">
+        <h5>Transform</h5>
+        <div class="vector-field">
+          <span class="vec-axis">Pos:</span>
+          <span>X: ${(transform.position[0] || 0).toFixed(2)}, Y: ${(transform.position[1] || 0).toFixed(2)}, Z: ${(transform.position[2] || 0).toFixed(2)}</span>
+        </div>
+        <div class="vector-field">
+          <span class="vec-axis">Rot:</span>
+          <span>X: ${(transform.rotation[0] || 0).toFixed(2)}, Y: ${(transform.rotation[1] || 0).toFixed(2)}, Z: ${(transform.rotation[2] || 0).toFixed(2)}</span>
+        </div>
+        <div class="vector-field">
+          <span class="vec-axis">Scale:</span>
+          <span>X: ${(transform.scale[0] || 1).toFixed(2)}, Y: ${(transform.scale[1] || 1).toFixed(2)}, Z: ${(transform.scale[2] || 1).toFixed(2)}</span>
+        </div>
+      </div>
+      <div class="inspector-card">
+        <h5>Attached Components (${components.length})</h5>
+        <ul class="components-list">
+          ${components.map(c => `<li>⚙️ ${escapeHtml(typeof c === 'string' ? c : (c.type || 'Component'))}</li>`).join('')}
+        </ul>
+      </div>
+    `;
+  }
+
+  // ── View 4: Script Explorer & Unified Diff Viewer ─────────────────────────
+  async function loadProjectScripts(projectId) {
+    const listContainer = document.getElementById('scripts-list-container');
+    const diffContainer = document.getElementById('script-diff-view');
+    const diffTitle = document.getElementById('script-diff-title');
+    if (!listContainer || !projectId) return;
+
+    listContainer.innerHTML = '<div class="spinner-small"></div> Loading scripts...';
+    try {
+      const res = await fetch(`/api/studio/projects/${encodeURIComponent(projectId)}/scripts`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const scripts = await res.json();
+
+      listContainer.innerHTML = '';
+      if (!scripts || scripts.length === 0) {
+        listContainer.innerHTML = '<div class="empty-note">No C# scripts registered for this project.</div>';
+        if (diffContainer) diffContainer.innerHTML = '<div class="empty-note">Select a script to view AST summary or diffs.</div>';
+        return;
+      }
+
+      scripts.forEach(s => {
+        const item = document.createElement('div');
+        item.className = `tree-item ${activeSelectedScript && activeSelectedScript.path === s.path ? 'selected' : ''}`;
+        item.innerHTML = `
+          <div class="tree-label">
+            <span class="tree-icon">📄</span>
+            <span class="tree-name">${escapeHtml(s.className || s.path)}</span>
+          </div>
+          <div class="tree-subtext">${escapeHtml(s.path || '')}</div>
+        `;
+        item.addEventListener('click', () => {
+          activeSelectedScript = s;
+          listContainer.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected'));
+          item.classList.add('selected');
+          renderScriptDiff(projectId, s);
+        });
+        listContainer.appendChild(item);
+      });
+
+      if (!activeSelectedScript && scripts.length > 0) {
+        activeSelectedScript = scripts[0];
+        const first = listContainer.querySelector('.tree-item');
+        if (first) first.classList.add('selected');
+        renderScriptDiff(projectId, scripts[0]);
+      }
+    } catch (err) {
+      listContainer.innerHTML = `<div class="error-note">Failed to load scripts: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function renderScriptDiff(projectId, script) {
+    const diffContainer = document.getElementById('script-diff-view');
+    const diffTitle = document.getElementById('script-diff-title');
+    if (!diffContainer || !script) return;
+
+    if (diffTitle) diffTitle.textContent = `Script Diff: ${script.className || script.path}`;
+
+    diffContainer.innerHTML = '<div class="spinner-small"></div> Computing diff...';
+    try {
+      const res = await fetch(`/api/studio/projects/${encodeURIComponent(projectId)}/scripts/diff`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          beforeContent: `// Original: ${script.className}\nusing UnityEngine;\n\npublic class ${script.className} : MonoBehaviour {\n    void Start() {}\n}`,
+          afterContent: `// Modified: ${script.className}\nusing UnityEngine;\n\npublic class ${script.className} : MonoBehaviour {\n    public float moveSpeed = 5.0f;\n    void Start() {\n        Debug.Log("${script.className} initialized");\n    }\n}`
+        })
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const diffLines = data.diffLines || [];
+
+      diffContainer.innerHTML = '';
+      const pre = document.createElement('pre');
+      pre.className = 'diff-code-block';
+
+      diffLines.forEach(line => {
+        const lineDiv = document.createElement('div');
+        if (line.startsWith('+')) {
+          lineDiv.className = 'diff-line diff-addition';
+        } else if (line.startsWith('-')) {
+          lineDiv.className = 'diff-line diff-deletion';
+        } else {
+          lineDiv.className = 'diff-line diff-context';
+        }
+        lineDiv.textContent = line;
+        pre.appendChild(lineDiv);
+      });
+      diffContainer.appendChild(pre);
+    } catch (err) {
+      diffContainer.innerHTML = `<div class="error-note">Diff calculation failed: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  // ── View 5: Asset Explorer ───────────────────────────────────────────────
+  function setupStudioAssetFilter() {
+    const chips = document.querySelectorAll('#asset-category-chips .chip');
+    chips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        chips.forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        activeAssetCategory = chip.getAttribute('data-cat') || '';
+        loadProjectAssets(activeStudioProjectId, activeAssetCategory);
+      });
+    });
+  }
+
+  async function loadProjectAssets(projectId, category) {
+    const grid = document.getElementById('assets-grid-container');
+    if (!grid || !projectId) return;
+
+    grid.innerHTML = '<div class="spinner-small"></div> Loading assets...';
+    try {
+      const url = category
+        ? `/api/studio/projects/${encodeURIComponent(projectId)}/assets?category=${encodeURIComponent(category)}`
+        : `/api/studio/projects/${encodeURIComponent(projectId)}/assets`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const assets = await res.json();
+
+      grid.innerHTML = '';
+      if (!assets || assets.length === 0) {
+        grid.innerHTML = '<div class="empty-note">No assets match the selected filter.</div>';
+        return;
+      }
+
+      const iconMap = {
+        'Prefab': '📦',
+        'Material': '🎨',
+        'Audio': '🎵',
+        'Model': '🗿',
+        'Texture': '🖼️',
+        'Scene': '🏛️',
+        'Script': '📝'
+      };
+
+      assets.forEach(a => {
+        const card = document.createElement('div');
+        card.className = 'asset-card';
+        const icon = iconMap[a.type] || '📁';
+        const name = a.path ? a.path.split(/[\\/]/).pop() : (a.name || 'Asset');
+        card.innerHTML = `
+          <div class="asset-icon">${icon}</div>
+          <div class="asset-info">
+            <h4 class="asset-name" title="${escapeHtml(name)}">${escapeHtml(name)}</h4>
+            <span class="asset-type-badge">${escapeHtml(a.type || 'Asset')}</span>
+            <span class="asset-path" title="${escapeHtml(a.path || '')}">${escapeHtml(a.path || '')}</span>
+            <span class="asset-guid">GUID: ${escapeHtml((a.guid || '').substring(0, 12))}...</span>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    } catch (err) {
+      grid.innerHTML = `<div class="error-note">Failed to load assets: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  // ── View 6: Change Review & Human Lead Approval Boundary ─────────────────
+  async function checkPendingChangesCount(projectId) {
+    const badge = document.getElementById('pending-changes-badge');
+    if (!badge || !projectId) return;
+
+    try {
+      const res = await fetch(`/api/studio/projects/${encodeURIComponent(projectId)}/changes/pending`);
+      if (res.ok) {
+        const pending = await res.json();
+        const count = Array.isArray(pending) ? pending.length : 0;
+        if (count > 0) {
+          badge.textContent = count;
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+      }
+    } catch (ignored) {}
+  }
+
+  async function loadPendingChanges(projectId) {
+    const listContainer = document.getElementById('changes-list-container');
+    if (!listContainer || !projectId) return;
+
+    listContainer.innerHTML = '<div class="spinner-small"></div> Loading change sets...';
+    try {
+      const res = await fetch(`/api/studio/projects/${encodeURIComponent(projectId)}/changes/pending`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const changeSets = await res.json();
+
+      listContainer.innerHTML = '';
+      checkPendingChangesCount(projectId);
+
+      if (!changeSets || changeSets.length === 0) {
+        listContainer.innerHTML = '<div class="empty-note">No changes pending review. All modifications approved or current workspace is clean.</div>';
+        return;
+      }
+
+      changeSets.forEach(cs => {
+        const item = document.createElement('div');
+        const riskClass = `risk-${(cs.riskLevel || 'low').toLowerCase()}`;
+        item.className = `change-set-card ${riskClass}`;
+
+        const entries = cs.changes || [];
+        item.innerHTML = `
+          <div class="change-set-header">
+            <div>
+              <span class="change-set-id">ChangeSet #${escapeHtml(cs.changeSetId)}</span>
+              <span class="run-id-pill">Run: ${escapeHtml(cs.agentRunId || 'N/A')}</span>
+            </div>
+            <span class="risk-badge ${riskClass}">Risk: ${escapeHtml(cs.riskLevel || 'LOW')}</span>
+          </div>
+          <div class="change-set-body">
+            <p class="change-justification"><strong>Justification:</strong> ${escapeHtml(cs.justification || 'Autonomous agent modification')}</p>
+            <div class="change-entries-list">
+              ${entries.map(e => `
+                <div class="change-entry-row">
+                  <span class="change-type-pill pill-${(e.changeType || 'modified').toLowerCase()}">${escapeHtml(e.changeType || 'MODIFIED')}</span>
+                  <span class="change-entry-path">${escapeHtml(e.filePath || '')}</span>
+                  <span class="entry-risk">${escapeHtml(e.riskLevel || 'LOW')}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <div class="change-set-actions">
+            <button class="btn btn-small btn-success btn-approve-cs" data-id="${escapeHtml(cs.changeSetId)}">
+              🛡️ Approve Changes
+            </button>
+            <button class="btn btn-small btn-danger btn-reject-cs" data-id="${escapeHtml(cs.changeSetId)}">
+              ❌ Reject Changes
+            </button>
+          </div>
+        `;
+
+        // Wire approval
+        const btnApprove = item.querySelector('.btn-approve-cs');
+        btnApprove.addEventListener('click', async () => {
+          btnApprove.disabled = true;
+          try {
+            const resp = await fetch(`/api/studio/changes/${encodeURIComponent(cs.changeSetId)}/approve`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ role: 'DEVELOPER', reviewerId: 'studio_lead' })
+            });
+            if (resp.ok) {
+              alert(`ChangeSet #${cs.changeSetId} approved successfully.`);
+              loadPendingChanges(projectId);
+            } else {
+              const err = await resp.json();
+              alert(`Approval rejected: ${err.error || 'Permission denied or prohibited self-approval'}`);
+            }
+          } catch (e) {
+            alert(`Approval failed: ${e.message}`);
+          } finally {
+            btnApprove.disabled = false;
+          }
+        });
+
+        // Wire rejection
+        const btnReject = item.querySelector('.btn-reject-cs');
+        btnReject.addEventListener('click', async () => {
+          const reason = prompt('Enter rejection reason / instructions for agent:');
+          if (reason === null) return;
+          btnReject.disabled = true;
+          try {
+            const resp = await fetch(`/api/studio/changes/${encodeURIComponent(cs.changeSetId)}/reject`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reviewerId: 'studio_lead', reason: reason || 'Rejected by user' })
+            });
+            if (resp.ok) {
+              alert(`ChangeSet #${cs.changeSetId} rejected.`);
+              loadPendingChanges(projectId);
+            }
+          } catch (e) {
+            alert(`Rejection failed: ${e.message}`);
+          } finally {
+            btnReject.disabled = false;
+          }
+        });
+
+        listContainer.appendChild(item);
+      });
+    } catch (err) {
+      listContainer.innerHTML = `<div class="error-note">Failed to load change review: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  // ── View 7: Build & Export Center ─────────────────────────────────────────
+  function setupStudioBuilds() {
+    const btnStart = document.getElementById('btn-start-build');
+    if (!btnStart) return;
+
+    btnStart.addEventListener('click', async () => {
+      const platformEl = document.getElementById('build-platform');
+      const configEl = document.getElementById('build-config');
+      const pathEl = document.getElementById('build-output-path');
+
+      const platform = platformEl ? platformEl.value : 'StandaloneWindows64';
+      const config = configEl ? configEl.value : 'Release';
+      const outputPath = pathEl ? pathEl.value.trim() : 'Builds/Windows/Game.exe';
+
+      btnStart.disabled = true;
+      btnStart.textContent = 'Triggering Build...';
+
+      try {
+        const res = await fetch(`/api/studio/projects/${encodeURIComponent(activeStudioProjectId)}/builds`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform, configuration: config, outputPath })
+        });
+
+        if (res.ok) {
+          const record = await res.json();
+          alert(`Build queued successfully (ID: ${record.buildId}). Verification pipeline running.`);
+          loadBuildHistory(activeStudioProjectId);
+        } else {
+          const err = await res.json();
+          alert(`Build failed: ${err.error || 'Unknown error'}`);
+        }
+      } catch (e) {
+        alert(`Build request error: ${e.message}`);
+      } finally {
+        btnStart.disabled = false;
+        btnStart.textContent = '🚀 Trigger Build';
+      }
+    });
+  }
+
+  async function loadBuildHistory(projectId) {
+    const container = document.getElementById('builds-history-container');
+    if (!container || !projectId) return;
+
+    container.innerHTML = '<div class="spinner-small"></div> Loading build records...';
+    try {
+      const res = await fetch(`/api/studio/projects/${encodeURIComponent(projectId)}/builds`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const builds = await res.json();
+
+      container.innerHTML = '';
+      if (!builds || builds.length === 0) {
+        container.innerHTML = '<div class="empty-note">No builds recorded for this project yet. Trigger a build above.</div>';
+        return;
+      }
+
+      builds.forEach(b => {
+        const card = document.createElement('div');
+        const statusClass = `status-${(b.status || 'queued').toLowerCase()}`;
+        card.className = `build-history-card ${statusClass}`;
+
+        const sizeStr = b.artifactSizeBytes ? `${(b.artifactSizeBytes / (1024 * 1024)).toFixed(1)} MB` : '0 MB';
+        const durationStr = b.durationSeconds != null ? `${b.durationSeconds}s` : 'In progress';
+        const existsIcon = b.artifactExists ? '✅ Exists' : '❌ Missing';
+
+        card.innerHTML = `
+          <div class="build-card-header">
+            <div class="build-platform-info">
+              <strong>${escapeHtml(b.platformTarget || 'StandaloneWindows64')}</strong>
+              <span class="build-config-pill">${escapeHtml(b.buildConfiguration || 'Release')}</span>
+            </div>
+            <span class="badge ${statusClass}">${escapeHtml(b.status || 'QUEUED')}</span>
+          </div>
+          <div class="build-card-body">
+            <div class="build-detail-row">
+              <span><strong>Output:</strong> ${escapeHtml(b.outputPath || '')}</span>
+              <span><strong>Artifact Verification:</strong> ${existsIcon} (${sizeStr})</span>
+            </div>
+            <div class="build-detail-row">
+              <span><strong>Exit Code:</strong> ${b.exitCode != null ? b.exitCode : 'N/A'}</span>
+              <span><strong>Duration:</strong> ${escapeHtml(durationStr)}</span>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    } catch (e) {
+      container.innerHTML = `<div class="error-note">Failed to load build history: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  // ── View 8: Centralized Diagnostics & Secret-Scrubbed Logs ────────────────
+  function setupStudioDiagnosticsFilters() {
+    const catSelect = document.getElementById('diag-filter-category');
+    const sevSelect = document.getElementById('diag-filter-severity');
+    const searchInput = document.getElementById('diag-search-input');
+
+    if (catSelect) catSelect.addEventListener('change', () => loadStudioDiagnostics());
+    if (sevSelect) sevSelect.addEventListener('change', () => loadStudioDiagnostics());
+    if (searchInput) {
+      let debounceTimer = null;
+      searchInput.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => loadStudioDiagnostics(), 300);
+      });
+    }
+  }
+
+  async function loadStudioDiagnostics() {
+    const container = document.getElementById('diagnostics-stream-container');
+    if (!container) return;
+
+    const cat = document.getElementById('diag-filter-category')?.value || '';
+    const sev = document.getElementById('diag-filter-severity')?.value || '';
+    const search = document.getElementById('diag-search-input')?.value.trim() || '';
+
+    const params = new URLSearchParams();
+    if (activeStudioProjectId) params.append('projectId', activeStudioProjectId);
+    if (cat) params.append('category', cat);
+    if (sev) params.append('severity', sev);
+    if (search) params.append('search', search);
+    params.append('limit', '80');
+
+    try {
+      const res = await fetch(`/api/studio/diagnostics?${params.toString()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const logs = await res.json();
+
+      container.innerHTML = '';
+      if (!logs || logs.length === 0) {
+        container.innerHTML = '<div class="empty-note">No diagnostics matching current filters.</div>';
+        return;
+      }
+
+      logs.forEach(log => {
+        const item = document.createElement('div');
+        const sevClass = `diag-${(log.severity || 'info').toLowerCase()}`;
+        item.className = `diag-stream-item ${sevClass}`;
+
+        const timeStr = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '';
+        item.innerHTML = `
+          <div class="diag-meta-bar">
+            <span class="diag-timestamp">${escapeHtml(timeStr)}</span>
+            <span class="diag-cat-pill cat-${(log.category || 'tools').toLowerCase()}">${escapeHtml(log.category || 'LOG')}</span>
+            <span class="diag-sev-badge ${sevClass}">${escapeHtml(log.severity || 'INFO')}</span>
+            <span class="diag-source">${escapeHtml(log.source || 'Studio')}</span>
+          </div>
+          <div class="diag-msg-body">${escapeHtml(log.message || '')}</div>
+        `;
+        container.appendChild(item);
+      });
+    } catch (err) {
+      container.innerHTML = `<div class="error-note">Failed to load diagnostics: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
 })();
+
