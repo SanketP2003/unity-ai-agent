@@ -96,17 +96,26 @@ public class UnityConnection extends TextWebSocketHandler {
     private volatile ScheduledFuture<?> pingTask;
 
     private final com.unityagent.memory.service.ProjectMemoryService projectMemoryService;
+    private final com.unityagent.agent.reliability.ToolExecutionTracker toolExecutionTracker;
 
     @org.springframework.beans.factory.annotation.Autowired
     public UnityConnection(ObjectMapper objectMapper,
                            @org.springframework.beans.factory.annotation.Autowired(required = false)
-                           com.unityagent.memory.service.ProjectMemoryService projectMemoryService) {
+                           com.unityagent.memory.service.ProjectMemoryService projectMemoryService,
+                           @org.springframework.beans.factory.annotation.Autowired(required = false)
+                           com.unityagent.agent.reliability.ToolExecutionTracker toolExecutionTracker) {
         this.objectMapper = objectMapper;
         this.projectMemoryService = projectMemoryService;
+        this.toolExecutionTracker = toolExecutionTracker;
+    }
+
+    public UnityConnection(ObjectMapper objectMapper,
+                           com.unityagent.memory.service.ProjectMemoryService projectMemoryService) {
+        this(objectMapper, projectMemoryService, null);
     }
 
     public UnityConnection(ObjectMapper objectMapper) {
-        this(objectMapper, null);
+        this(objectMapper, null, null);
     }
 
     // --- Connection state ---
@@ -117,6 +126,9 @@ public class UnityConnection extends TextWebSocketHandler {
         CONNECTED,
         HANDSHAKING,
         READY,
+        DEGRADED,
+        RECONNECTING,
+        FAILED,
         ERROR
     }
 
@@ -191,6 +203,9 @@ public class UnityConnection extends TextWebSocketHandler {
             }
         } else if (!projectConnections.isEmpty()) {
             this.state = ConnectionState.READY;
+        }
+        if (toolExecutionTracker != null) {
+            toolExecutionTracker.markInFlightAsUnknown(projectId, "Unity WebSocket disconnected: " + status);
         }
         failAllPending("Unity disconnected");
     }

@@ -46,6 +46,8 @@ public class OpenAICompatibleProvider implements AIProvider {
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
     private final OpenAIToolMapper toolMapper;
+    private final com.unityagent.agent.resilience.CircuitBreaker circuitBreaker;
+    private final com.unityagent.agent.resilience.ProviderRetryPolicy retryPolicy;
 
     @Autowired
     public OpenAICompatibleProvider(
@@ -54,18 +56,9 @@ public class OpenAICompatibleProvider implements AIProvider {
             @Value("${agent.ai.model:}") String model,
             @Value("${agent.ai.timeout-seconds:120}") int timeoutSeconds,
             @Autowired(required = false) ObjectMapper mapper) {
-        this.baseUrl = baseUrl != null ? baseUrl.trim() : "";
-        this.apiKey = apiKey != null ? apiKey.trim() : "";
-        this.model = model != null ? model.trim() : "";
-        this.timeoutSeconds = timeoutSeconds > 0 ? timeoutSeconds : 120;
-        this.mapper = mapper != null ? mapper : new ObjectMapper();
-        this.toolMapper = new OpenAIToolMapper(this.mapper);
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(15))
-                .build();
-
-        log.info("OpenAICompatibleProvider initialized with model: '{}', endpoint: '{}', apiKeyConfigured: {}",
-                this.model, this.baseUrl, !this.apiKey.isBlank());
+        this(baseUrl, apiKey, model, timeoutSeconds,
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build(),
+                mapper != null ? mapper : new ObjectMapper());
     }
 
     /**
@@ -80,6 +73,19 @@ public class OpenAICompatibleProvider implements AIProvider {
         this.mapper = mapper != null ? mapper : new ObjectMapper();
         this.toolMapper = new OpenAIToolMapper(this.mapper);
         this.httpClient = httpClient;
+        this.circuitBreaker = new com.unityagent.agent.resilience.CircuitBreaker("openai-compatible");
+        this.retryPolicy = new com.unityagent.agent.resilience.ProviderRetryPolicy();
+
+        log.info("OpenAICompatibleProvider initialized with model: '{}', endpoint: '{}', apiKeyConfigured: {}",
+                this.model, this.baseUrl, !this.apiKey.isBlank());
+    }
+
+    public com.unityagent.agent.resilience.CircuitBreaker getCircuitBreaker() {
+        return circuitBreaker;
+    }
+
+    public com.unityagent.agent.resilience.ProviderRetryPolicy getRetryPolicy() {
+        return retryPolicy;
     }
 
     @Override
@@ -116,21 +122,37 @@ public class OpenAICompatibleProvider implements AIProvider {
             );
         }
 
-        int maxAttempts = 3;
+        if (!circuitBreaker.allowRequest()) {
+            throw new com.unityagent.agent.resilience.CircuitBreakerOpenException(
+                    "Circuit breaker for " + getProviderName() + " is OPEN. AI Provider requests are temporarily rejected until recovery timeout.");
+        }
+
+        int maxAttempts = retryPolicy.getMaxRetries();
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                return executeRequest(prompt);
-            } catch (AIProviderException e) {
-                if (attempt == maxAttempts || Integer.valueOf(401).equals(e.getHttpStatus()) || (e.getMessage() != null && e.getMessage().contains("not configured"))) {
-                    throw e;
+                AgentCompletion completion = executeRequest(prompt);
+                circuitBreaker.recordSuccess();
+                return completion;
+            } catch (Exception e) {
+                boolean retryable = retryPolicy.isRetryable(e);
+                circuitBreaker.recordFailure(retryable);
+
+                if (!retryable || attempt == maxAttempts) {
+                    if (e instanceof AIProviderException ape) {
+                        throw ape;
+                    }
+                    throw new AIProviderException("AI provider request failed: " + e.getMessage(), ErrorType.PROVIDER_ERROR, 500);
                 }
-                log.warn("Attempt {}/{} to OpenAI-compatible provider failed (transient): {}. Retrying in 1.5s...",
-                        attempt, maxAttempts, e.getMessage());
+
+                long backoffMs = retryPolicy.calculateBackoffMs(attempt);
+                log.warn("Attempt {}/{} to OpenAI-compatible provider failed (transient): {}. Retrying in {}ms...",
+                        attempt, maxAttempts, e.getMessage(), backoffMs);
                 try {
-                    Thread.sleep(1500);
+                    Thread.sleep(backoffMs);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                    throw e;
+                    if (e instanceof AIProviderException ape) throw ape;
+                    throw new AIProviderException("Interrupted during provider retry", ErrorType.PROVIDER_ERROR, 500);
                 }
             }
         }

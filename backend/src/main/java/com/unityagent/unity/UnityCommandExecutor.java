@@ -20,10 +20,23 @@ public class UnityCommandExecutor {
 
     private final UnityConnection connection;
     private final ToolRegistry toolRegistry;
+    private final com.unityagent.agent.reliability.ToolExecutionTracker tracker;
+    private final com.unityagent.agent.security.ToolArgumentValidator argumentValidator;
 
-    public UnityCommandExecutor(UnityConnection connection, ToolRegistry toolRegistry) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public UnityCommandExecutor(UnityConnection connection, ToolRegistry toolRegistry,
+                                @org.springframework.beans.factory.annotation.Autowired(required = false)
+                                com.unityagent.agent.reliability.ToolExecutionTracker tracker,
+                                @org.springframework.beans.factory.annotation.Autowired(required = false)
+                                com.unityagent.agent.security.ToolArgumentValidator argumentValidator) {
         this.connection = connection;
         this.toolRegistry = toolRegistry;
+        this.tracker = tracker;
+        this.argumentValidator = argumentValidator != null ? argumentValidator : new com.unityagent.agent.security.ToolArgumentValidator();
+    }
+
+    public UnityCommandExecutor(UnityConnection connection, ToolRegistry toolRegistry) {
+        this(connection, toolRegistry, null, null);
     }
 
     /**
@@ -78,6 +91,14 @@ public class UnityCommandExecutor {
             throw new IllegalArgumentException("Invalid parameters for tool '" + toolName + "': " + validationError);
         }
 
+        // Security validation against path traversal and malicious arguments
+        if (argumentValidator != null) {
+            var secResult = argumentValidator.validate(toolName, parameters);
+            if (!secResult.isValid()) {
+                throw new SecurityException("Security validation failed for tool '" + toolName + "': " + secResult.getErrorMessage());
+            }
+        }
+
         // Build and send request with correlated operationId and optional projectId
         UnityMessage request = UnityMessage.toolRequest(operationId, toolName, parameters);
         if (projectId != null) {
@@ -85,14 +106,36 @@ public class UnityCommandExecutor {
         }
         log.info("Executing tool: {} (operationId={}, projectId={})", toolName, request.getOperationId(), projectId);
 
-        UnityMessage response = connection.sendToolRequest(projectId, request);
-
-        if (Boolean.TRUE.equals(response.getSuccess())) {
-            log.info("Tool '{}' completed successfully (operationId={})", toolName, response.getOperationId());
-        } else {
-            log.warn("Tool '{}' failed (operationId={}): {}", toolName, response.getOperationId(), response.getErrors());
+        com.unityagent.agent.reliability.ToolExecutionRecord record = null;
+        if (tracker != null) {
+            record = tracker.registerExecution(null, request.getOperationId(), projectId, null, toolName, parameters, 30);
+            record.markRunning();
         }
 
-        return response;
+        try {
+            UnityMessage response = connection.sendToolRequest(projectId, request);
+
+            if (record != null) {
+                if (Boolean.TRUE.equals(response.getSuccess())) {
+                    record.markSucceeded(response.getData());
+                } else {
+                    record.markFailed(response.getErrors() != null ? response.getErrors().toString() : "Failed");
+                }
+            }
+
+            if (Boolean.TRUE.equals(response.getSuccess())) {
+                log.info("Tool '{}' completed successfully (operationId={})", toolName, response.getOperationId());
+            } else {
+                log.warn("Tool '{}' failed (operationId={}): {}", toolName, response.getOperationId(), response.getErrors());
+            }
+
+            return response;
+        } catch (TimeoutException te) {
+            if (record != null) record.markTimedOut();
+            throw te;
+        } catch (Exception e) {
+            if (record != null) record.markUnknown("Exception during tool dispatch: " + e.getMessage());
+            throw e;
+        }
     }
 }

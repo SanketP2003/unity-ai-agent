@@ -168,17 +168,6 @@ public class AgentController {
         return agentService.subscribeToEvents(sessionId);
     }
 
-    /**
-     * GET /api/health — basic health check.
-     */
-    @GetMapping("/health")
-    public ResponseEntity<Map<String, Object>> health() {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("status", "UP");
-        result.put("service", "autonomous-unity-agent");
-        result.put("version", "0.1.0");
-        return ResponseEntity.ok(result);
-    }
 
     /**
      * GET /api/status — detailed agent, bridge, and LLM connection status.

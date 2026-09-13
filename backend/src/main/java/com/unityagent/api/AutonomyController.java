@@ -30,11 +30,22 @@ public class AutonomyController {
 
     private final AutonomousRunController runController;
     private final CheckpointService checkpointService;
+    private final com.unityagent.agent.events.EventJournalService eventJournalService;
+    private final com.unityagent.agent.persistence.RunPersistenceService persistenceService;
 
     @Autowired
-    public AutonomyController(AutonomousRunController runController, CheckpointService checkpointService) {
+    public AutonomyController(AutonomousRunController runController,
+                              CheckpointService checkpointService,
+                              @Autowired(required = false) com.unityagent.agent.events.EventJournalService eventJournalService,
+                              @Autowired(required = false) com.unityagent.agent.persistence.RunPersistenceService persistenceService) {
         this.runController = runController;
         this.checkpointService = checkpointService;
+        this.eventJournalService = eventJournalService;
+        this.persistenceService = persistenceService;
+    }
+
+    public AutonomyController(AutonomousRunController runController, CheckpointService checkpointService) {
+        this(runController, checkpointService, null, null);
     }
 
     /**
@@ -62,6 +73,21 @@ public class AutonomyController {
             response.put("lastCheckpointId", state.getLastCheckpointId());
 
             return ResponseEntity.ok(response);
+        } catch (com.unityagent.agent.concurrency.ProjectConflictException pce) {
+            log.warn("Project lock conflict: {}", pce.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of(
+                            "error", pce.getMessage(),
+                            "conflictProjectId", pce.getProjectId(),
+                            "activeRunId", pce.getActiveRunId() != null ? pce.getActiveRunId() : ""
+                    ));
+        } catch (com.unityagent.agent.budget.BudgetExceededException bee) {
+            log.warn("Resource budget exceeded: {}", bee.getMessage());
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of(
+                            "error", bee.getMessage(),
+                            "reason", bee.getReason().name()
+                    ));
         } catch (Exception e) {
             log.error("Failed to start autonomous run: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -235,5 +261,42 @@ public class AutonomyController {
 
         List<AutonomyCheckpoint> list = checkpointService.listCheckpoints(state.getProjectId());
         return ResponseEntity.ok(list);
+    }
+
+    /**
+     * Retrieve durable event journal for a run (used to reconstruct UI timeline on browser refresh).
+     */
+    @GetMapping("/{runId}/events")
+    public ResponseEntity<List<com.unityagent.agent.events.RunEventRecord>> getRunEvents(
+            @PathVariable String runId,
+            @RequestParam(defaultValue = "0") long sinceSequence) {
+        if (eventJournalService == null) {
+            return ResponseEntity.ok(List.of());
+        }
+        return ResponseEntity.ok(eventJournalService.getEventsSince(runId, sinceSequence));
+    }
+
+    /**
+     * Retrieve persistent run records for a project.
+     */
+    @GetMapping("/projects/{projectId}/runs")
+    public ResponseEntity<List<com.unityagent.agent.persistence.AutonomousRunRecord>> getProjectRuns(@PathVariable String projectId) {
+        if (persistenceService == null) {
+            return ResponseEntity.ok(List.of());
+        }
+        return ResponseEntity.ok(persistenceService.getRunsByProject(projectId));
+    }
+
+    /**
+     * Retrieve single persistent run record.
+     */
+    @GetMapping("/{runId}/record")
+    public ResponseEntity<com.unityagent.agent.persistence.AutonomousRunRecord> getRunRecord(@PathVariable String runId) {
+        if (persistenceService == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return persistenceService.getRun(runId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 }

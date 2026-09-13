@@ -7,6 +7,7 @@ import com.unityagent.agent.goal.GoalAnalyzer;
 import com.unityagent.agent.goal.GoalRequirement;
 import com.unityagent.agent.goal.RequirementManager;
 import com.unityagent.agent.model.AgentRunResult;
+import com.unityagent.agent.persistence.AutonomousRunRecord;
 import com.unityagent.agent.plan.AgentPlan;
 import com.unityagent.agent.plan.LongHorizonPlanner;
 import com.unityagent.agent.plan.PlanNode;
@@ -59,6 +60,11 @@ public class AutonomousRunController {
     private final CompletionGate completionGate;
     private final CheckpointService checkpointService;
     private final AutonomyLimits limits;
+    private final com.unityagent.agent.concurrency.ProjectLockService projectLockService;
+    private final com.unityagent.agent.budget.ResourceBudget resourceBudget;
+    private final com.unityagent.agent.persistence.RunPersistenceService persistenceService;
+    private final com.unityagent.agent.events.EventJournalService eventJournalService;
+    private final com.unityagent.agent.observability.MetricsService metricsService;
 
     private final Map<String, AutonomousRunState> activeRuns = new ConcurrentHashMap<>();
     private final Map<String, CancellationToken> runCancellationTokens = new ConcurrentHashMap<>();
@@ -73,10 +79,50 @@ public class AutonomousRunController {
                                    ObjectiveValidator objectiveValidator,
                                    CompletionGate completionGate,
                                    CheckpointService checkpointService,
-                                   @Autowired(required = false) AutonomyLimits limits) {
+                                   @Autowired(required = false) AutonomyLimits limits,
+                                   @Autowired(required = false) com.unityagent.agent.concurrency.ProjectLockService projectLockService,
+                                   @Autowired(required = false) com.unityagent.agent.budget.ResourceBudget resourceBudget,
+                                   @Autowired(required = false) com.unityagent.agent.persistence.RunPersistenceService persistenceService,
+                                   @Autowired(required = false) com.unityagent.agent.events.EventJournalService eventJournalService,
+                                   @Autowired(required = false) com.unityagent.agent.observability.MetricsService metricsService) {
         this(goalAnalyzer, new RequirementManager(), planner, agentLoop, replanningEngine,
                 failureClassifier, recoveryEngine, objectiveValidator, completionGate,
-                checkpointService, limits != null ? limits : AutonomyLimits.defaultLimits());
+                checkpointService, limits != null ? limits : AutonomyLimits.defaultLimits(),
+                projectLockService, resourceBudget, persistenceService, eventJournalService, metricsService);
+    }
+
+    public AutonomousRunController(GoalAnalyzer goalAnalyzer,
+                                   RequirementManager requirementManager,
+                                   LongHorizonPlanner planner,
+                                   AgentLoop agentLoop,
+                                   ReplanningEngine replanningEngine,
+                                   FailureClassifier failureClassifier,
+                                   RecoveryEngine recoveryEngine,
+                                   ObjectiveValidator objectiveValidator,
+                                   CompletionGate completionGate,
+                                   CheckpointService checkpointService,
+                                   AutonomyLimits limits,
+                                   com.unityagent.agent.concurrency.ProjectLockService projectLockService,
+                                   com.unityagent.agent.budget.ResourceBudget resourceBudget,
+                                   com.unityagent.agent.persistence.RunPersistenceService persistenceService,
+                                   com.unityagent.agent.events.EventJournalService eventJournalService,
+                                   com.unityagent.agent.observability.MetricsService metricsService) {
+        this.goalAnalyzer = goalAnalyzer;
+        this.requirementManager = requirementManager;
+        this.planner = planner;
+        this.agentLoop = agentLoop;
+        this.replanningEngine = replanningEngine;
+        this.failureClassifier = failureClassifier;
+        this.recoveryEngine = recoveryEngine;
+        this.objectiveValidator = objectiveValidator;
+        this.completionGate = completionGate;
+        this.checkpointService = checkpointService;
+        this.limits = limits != null ? limits : AutonomyLimits.defaultLimits();
+        this.projectLockService = projectLockService;
+        this.resourceBudget = resourceBudget;
+        this.persistenceService = persistenceService;
+        this.eventJournalService = eventJournalService;
+        this.metricsService = metricsService;
     }
 
     public AutonomousRunController(GoalAnalyzer goalAnalyzer,
@@ -90,17 +136,9 @@ public class AutonomousRunController {
                                    CompletionGate completionGate,
                                    CheckpointService checkpointService,
                                    AutonomyLimits limits) {
-        this.goalAnalyzer = goalAnalyzer;
-        this.requirementManager = requirementManager;
-        this.planner = planner;
-        this.agentLoop = agentLoop;
-        this.replanningEngine = replanningEngine;
-        this.failureClassifier = failureClassifier;
-        this.recoveryEngine = recoveryEngine;
-        this.objectiveValidator = objectiveValidator;
-        this.completionGate = completionGate;
-        this.checkpointService = checkpointService;
-        this.limits = limits != null ? limits : AutonomyLimits.defaultLimits();
+        this(goalAnalyzer, requirementManager, planner, agentLoop, replanningEngine,
+                failureClassifier, recoveryEngine, objectiveValidator, completionGate,
+                checkpointService, limits, null, null, null, null, null);
     }
 
     public AutonomousRunController(GoalAnalyzer goalAnalyzer,
@@ -115,7 +153,7 @@ public class AutonomousRunController {
                                    CheckpointService checkpointService) {
         this(goalAnalyzer, requirementManager, planner, agentLoop, replanningEngine,
                 failureClassifier, recoveryEngine, objectiveValidator, completionGate,
-                checkpointService, AutonomyLimits.defaultLimits());
+                checkpointService, AutonomyLimits.defaultLimits(), null, null, null, null, null);
     }
 
     /**
@@ -129,11 +167,35 @@ public class AutonomousRunController {
 
         log.info("Starting autonomous run {} for project {} with prompt: {}", runId, projectId, userPrompt);
 
+        // 0. Concurrency & Isolation limits
+        if (resourceBudget != null) {
+            resourceBudget.validateConcurrentRuns(activeRuns.size());
+        }
+        if (projectLockService != null) {
+            projectLockService.acquireProjectLock(projectId, runId);
+            projectLockService.acquireSessionLock(sessionId, runId);
+        }
+        if (metricsService != null) {
+            metricsService.recordRunStarted();
+        }
+
+        if (eventJournalService != null) {
+            eventJournalService.recordEvent(projectId, sessionId, runId,
+                    com.unityagent.agent.events.RunEventType.RUN_CREATED, "Created run with prompt: " + userPrompt);
+            eventJournalService.recordEvent(projectId, sessionId, runId,
+                    com.unityagent.agent.events.RunEventType.RUN_STARTED, "Started autonomous run");
+        }
+
         // 1. Analyze prompt into structured GameGoal and machine-verifiable requirements
         GameGoal goal = goalAnalyzer.analyzeGoal(userPrompt, projectId);
 
         // 2. Synthesize multi-step DAG AgentPlan
         AgentPlan plan = planner.createPlan(goal);
+
+        if (eventJournalService != null) {
+            eventJournalService.recordEvent(projectId, sessionId, runId,
+                    com.unityagent.agent.events.RunEventType.PLAN_CREATED, "Created plan with " + plan.getPlanNodes().size() + " nodes");
+        }
 
         // 3. Initialize state and cancellation token
         AutonomousRunState state = new AutonomousRunState(runId, sessionId, projectId, goal, plan);
@@ -143,8 +205,9 @@ public class AutonomousRunController {
         activeRuns.put(runId, state);
         runCancellationTokens.put(runId, cancellationToken);
 
-        // Save initial checkpoint
+        // Save initial checkpoint and persistent run record
         saveMilestoneCheckpoint(state, "Initial plan created");
+        persistRunSnapshot(state, "Initial plan created");
 
         return state;
     }
@@ -166,6 +229,18 @@ public class AutonomousRunController {
             return false;
         }
 
+        // Check production resource budgets
+        if (resourceBudget != null) {
+            resourceBudget.validateBudget(
+                    runId,
+                    state.getExecutionState().getElapsedSeconds(),
+                    state.getExecutionState().getTotalToolCalls(),
+                    state.getExecutionState().getTotalNodes(),
+                    state.getPlan().getRevisions().size(),
+                    recoveryEngine.getCurrentCycles()
+            );
+        }
+
         // Check autonomy limits
         String limitViolation = limits.checkLimits(
                 state.getExecutionState(),
@@ -183,6 +258,11 @@ public class AutonomousRunController {
             );
             state.setCurrentIntervention(boundary);
             state.setStatus(AutonomousRunState.RunStatus.AWAITING_INTERVENTION);
+            if (eventJournalService != null) {
+                eventJournalService.recordEvent(state.getProjectId(), state.getSessionId(), runId,
+                        com.unityagent.agent.events.RunEventType.HUMAN_INTERVENTION_REQUIRED, "Limit exceeded: " + limitViolation);
+            }
+            persistRunSnapshot(state, "Limit exceeded: " + limitViolation);
             return false;
         }
 
@@ -211,6 +291,11 @@ public class AutonomousRunController {
         String subRunId = runId + "_" + targetNode.getNodeId();
 
         log.info("Submitting sub-goal [{}] to AgentLoop: {}", targetNode.getNodeId(), targetNode.getDescription());
+        if (eventJournalService != null) {
+            eventJournalService.recordEvent(state.getProjectId(), state.getSessionId(), runId,
+                    com.unityagent.agent.events.RunEventType.NODE_STARTED, "Executing " + targetNode.getNodeId() + ": " + targetNode.getDescription());
+        }
+        persistRunSnapshot(state, "Started node " + targetNode.getNodeId());
 
         // AgentLoop is the SOLE LLM/tool execution engine
         AgentRunResult result = agentLoop.run(
@@ -231,8 +316,17 @@ public class AutonomousRunController {
             plan.markNodeCompleted(targetNode.getNodeId(), result.getResponse());
             state.getExecutionState().recordNodeCompleted(targetNode.getNodeId());
 
+            if (eventJournalService != null) {
+                eventJournalService.recordEvent(state.getProjectId(), state.getSessionId(), runId,
+                        com.unityagent.agent.events.RunEventType.NODE_COMPLETED, "Completed " + targetNode.getNodeId());
+            }
+            if (metricsService != null) {
+                metricsService.recordToolExecution(true);
+            }
+
             // Save milestone checkpoint periodically
             saveMilestoneCheckpoint(state, "Completed " + targetNode.getNodeId());
+            persistRunSnapshot(state, "Completed " + targetNode.getNodeId());
 
             // Check if all nodes are now complete
             if (plan.getStatus() == AgentPlan.PlanStatus.COMPLETED ||
@@ -243,6 +337,15 @@ public class AutonomousRunController {
         } else {
             log.warn("Sub-goal [{}] failed: {}", targetNode.getNodeId(), result.getErrorMessage());
             plan.markNodeFailed(targetNode.getNodeId(), result.getErrorMessage());
+
+            if (eventJournalService != null) {
+                eventJournalService.recordEvent(state.getProjectId(), state.getSessionId(), runId,
+                        com.unityagent.agent.events.RunEventType.NODE_FAILED, "Failed " + targetNode.getNodeId() + ": " + result.getErrorMessage());
+            }
+            if (metricsService != null) {
+                metricsService.recordToolExecution(false);
+            }
+            persistRunSnapshot(state, "Failed " + targetNode.getNodeId());
 
             handleFailure(state, targetNode, result);
             return false;
@@ -261,6 +364,14 @@ public class AutonomousRunController {
         RecoveryStrategy strategy = recoveryEngine.determineStrategy(ctx);
         log.info("Determined recovery strategy: {}", strategy);
 
+        if (eventJournalService != null) {
+            eventJournalService.recordEvent(state.getProjectId(), state.getSessionId(), state.getRunId(),
+                    com.unityagent.agent.events.RunEventType.RECOVERY_STARTED, "Strategy: " + strategy.getType() + " - " + strategy.getActionDescription());
+        }
+        if (metricsService != null) {
+            metricsService.recordRecoveryCycle();
+        }
+
         if (strategy.requiresHuman()) {
             HumanInterventionBoundary boundary = new HumanInterventionBoundary(
                     "int_" + UUID.randomUUID().toString().substring(0, 8),
@@ -271,19 +382,33 @@ public class AutonomousRunController {
             );
             state.setCurrentIntervention(boundary);
             state.setStatus(AutonomousRunState.RunStatus.AWAITING_INTERVENTION);
+            if (eventJournalService != null) {
+                eventJournalService.recordEvent(state.getProjectId(), state.getSessionId(), state.getRunId(),
+                        com.unityagent.agent.events.RunEventType.HUMAN_INTERVENTION_REQUIRED, strategy.getActionDescription());
+            }
+            persistRunSnapshot(state, "Awaiting intervention: " + strategy.getActionDescription());
         } else if (strategy.getType() == RecoveryStrategy.StrategyType.REPLAN_SUBGRAPH) {
             state.getExecutionState().recordReplan();
+            if (metricsService != null) {
+                metricsService.recordReplan();
+            }
             replanningEngine.replanOnFailure(
                     state.getPlan(),
                     failedNode.getNodeId(),
                     strategy.getActionDescription(),
                     ctx.getTargetFileOrAsset()
             );
+            if (eventJournalService != null) {
+                eventJournalService.recordEvent(state.getProjectId(), state.getSessionId(), state.getRunId(),
+                        com.unityagent.agent.events.RunEventType.PLAN_REVISED, "Replanned sub-graph after failure on " + failedNode.getNodeId());
+            }
             saveMilestoneCheckpoint(state, "Replanned on failure: " + failedNode.getNodeId());
+            persistRunSnapshot(state, "Replanned " + failedNode.getNodeId());
         } else {
             // Reset node to PENDING to retry with adjusted parameters
             failedNode.setStatus(PlanNode.PlanNodeStatus.PENDING);
             failedNode.incrementAttempts();
+            persistRunSnapshot(state, "Retrying " + failedNode.getNodeId());
         }
     }
 
@@ -293,19 +418,57 @@ public class AutonomousRunController {
     private boolean finalizeRun(AutonomousRunState state) {
         log.info("All plan nodes completed for run {}. Running authoritative CompletionGate validation...", state.getRunId());
 
+        if (eventJournalService != null) {
+            eventJournalService.recordEvent(state.getProjectId(), state.getSessionId(), state.getRunId(),
+                    com.unityagent.agent.events.RunEventType.VALIDATION_STARTED, "Beginning CompletionGate validation");
+        }
+
         ValidationReport report = objectiveValidator.validateAll(state.getGoal(), state.getAccumulatedEvidence());
         state.setValidationReport(report);
 
+        if (eventJournalService != null) {
+            eventJournalService.recordEvent(state.getProjectId(), state.getSessionId(), state.getRunId(),
+                    com.unityagent.agent.events.RunEventType.VALIDATION_COMPLETED, "Validation report: " + report.getSummary());
+        }
+
+        long durationMs = state.getExecutionState().getElapsedSeconds() * 1000L;
         boolean canComplete = completionGate.canComplete(report);
         if (canComplete) {
             state.setStatus(AutonomousRunState.RunStatus.COMPLETED);
             state.setCompletedAt(Instant.now());
             saveMilestoneCheckpoint(state, "Goal completed and verified by CompletionGate");
+            persistRunSnapshot(state, "Completed");
+
+            if (eventJournalService != null) {
+                eventJournalService.recordEvent(state.getProjectId(), state.getSessionId(), state.getRunId(),
+                        com.unityagent.agent.events.RunEventType.RUN_COMPLETED, "Run completed successfully");
+            }
+            if (metricsService != null) {
+                metricsService.recordRunCompleted(true, durationMs);
+            }
+            if (projectLockService != null) {
+                projectLockService.releaseProjectLock(state.getProjectId(), state.getRunId());
+                projectLockService.releaseSessionLock(state.getSessionId(), state.getRunId());
+            }
             log.info("Run {} SUCCESSFULLY COMPLETED. All acceptance criteria satisfied.", state.getRunId());
             return false;
         } else {
             log.warn("CompletionGate REJECTED completion for run {}: {}", state.getRunId(), report.getSummary());
             state.setStatus(AutonomousRunState.RunStatus.FAILED);
+            persistRunSnapshot(state, "Failed CompletionGate");
+
+            if (eventJournalService != null) {
+                eventJournalService.recordEvent(state.getProjectId(), state.getSessionId(), state.getRunId(),
+                        com.unityagent.agent.events.RunEventType.RUN_FAILED, "CompletionGate rejected: " + report.getSummary());
+            }
+            if (metricsService != null) {
+                metricsService.recordValidationFailure();
+                metricsService.recordRunCompleted(false, durationMs);
+            }
+            if (projectLockService != null) {
+                projectLockService.releaseProjectLock(state.getProjectId(), state.getRunId());
+                projectLockService.releaseSessionLock(state.getSessionId(), state.getRunId());
+            }
             return false;
         }
     }
@@ -326,6 +489,32 @@ public class AutonomousRunController {
         }
     }
 
+    private void persistRunSnapshot(AutonomousRunState state, String milestone) {
+        if (persistenceService == null || state == null) return;
+        try {
+            AutonomousRunRecord rec = new AutonomousRunRecord(
+                    state.getRunId(), state.getSessionId(), state.getProjectId(),
+                    state.getGoal() != null ? state.getGoal().getDescription() : "",
+                    state.getStatus() != null ? state.getStatus().name() : "RUNNING"
+            );
+            rec.setCurrentPlanRevision(state.getPlan() != null ? state.getPlan().getRevisions().size() : 0);
+            rec.setCompletedNodes(new ArrayList<>(state.getExecutionState().getCompletedNodes()));
+            rec.setToolCallCount(state.getExecutionState().getTotalToolCalls());
+            rec.setRecoveryCount(state.getExecutionState().getRecoveryCycles());
+            rec.setReplanCount(state.getExecutionState().getReplans());
+            rec.setCheckpointRef(state.getLastCheckpointId());
+            if (state.getValidationReport() != null) {
+                rec.setFinalValidationResult(state.getValidationReport().getSummary());
+            }
+            if (state.getCompletedAt() != null) {
+                rec.setCompletedAt(state.getCompletedAt());
+            }
+            persistenceService.saveRun(rec);
+        } catch (Exception e) {
+            log.warn("Failed to persist run snapshot for {}: {}", state.getRunId(), e.getMessage());
+        }
+    }
+
     public synchronized AutonomousRunState pauseRun(String runId, String reason) {
         AutonomousRunState state = activeRuns.get(runId);
         if (state != null) {
@@ -339,6 +528,11 @@ public class AutonomousRunController {
             );
             state.setCurrentIntervention(boundary);
             saveMilestoneCheckpoint(state, "Paused: " + reason);
+            if (eventJournalService != null) {
+                eventJournalService.recordEvent(state.getProjectId(), state.getSessionId(), runId,
+                        com.unityagent.agent.events.RunEventType.RUN_PAUSED, "Run paused: " + reason);
+            }
+            persistRunSnapshot(state, "Paused");
         }
         return state;
     }
@@ -356,6 +550,11 @@ public class AutonomousRunController {
             state.setStatus(AutonomousRunState.RunStatus.RUNNING);
             state.setCurrentIntervention(null);
             log.info("Reconciled and resumed run {} from checkpoint {}", runId, checkpointId);
+            if (eventJournalService != null) {
+                eventJournalService.recordEvent(state.getProjectId(), state.getSessionId(), runId,
+                        com.unityagent.agent.events.RunEventType.RUN_RESUMED, "Resumed from checkpoint " + checkpointId);
+            }
+            persistRunSnapshot(state, "Resumed");
         }
         return state;
     }
@@ -369,6 +568,15 @@ public class AutonomousRunController {
                 token.cancel();
             }
             saveMilestoneCheckpoint(state, "Cancelled by user");
+            if (projectLockService != null) {
+                projectLockService.releaseProjectLock(state.getProjectId(), state.getRunId());
+                projectLockService.releaseSessionLock(state.getSessionId(), state.getRunId());
+            }
+            if (eventJournalService != null) {
+                eventJournalService.recordEvent(state.getProjectId(), state.getSessionId(), runId,
+                        com.unityagent.agent.events.RunEventType.RUN_CANCELLED, "Run cancelled by user");
+            }
+            persistRunSnapshot(state, "Cancelled");
         }
         return state;
     }

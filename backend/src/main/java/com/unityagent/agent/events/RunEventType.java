@@ -1,0 +1,35 @@
+package com.unityagent.agent.events;
+
+/**
+ * Standard event types for the durable event journal.
+ * Each transition is recorded with a monotonic sequence per run.
+ */
+public enum RunEventType {
+    RUN_CREATED,
+    RUN_STARTED,
+    PLAN_CREATED,
+    PLAN_REVISED,
+    NODE_STARTED,
+    NODE_COMPLETED,
+    NODE_FAILED,
+    TOOL_STARTED,
+    TOOL_COMPLETED,
+    TOOL_FAILED,
+    RECOVERY_STARTED,
+    RECOVERY_COMPLETED,
+    CHECKPOINT_CREATED,
+    UNITY_CONNECTED,
+    UNITY_DISCONNECTED,
+    COMPILATION_STARTED,
+    COMPILATION_COMPLETED,
+    BEHAVIOR_TEST_STARTED,
+    BEHAVIOR_TEST_COMPLETED,
+    VALIDATION_STARTED,
+    VALIDATION_COMPLETED,
+    HUMAN_INTERVENTION_REQUIRED,
+    RUN_PAUSED,
+    RUN_RESUMED,
+    RUN_CANCELLED,
+    RUN_FAILED,
+    RUN_COMPLETED
+}

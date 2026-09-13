@@ -9,7 +9,7 @@ public final class MemorySchema {
 
     private MemorySchema() {}
 
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 2;
 
     // ── Schema versioning ──────────────────────────────────────────────
 
@@ -135,6 +135,51 @@ public final class MemorySchema {
             )
             """;
 
+    // ── Autonomous runs ───────────────────────────────────────────────
+
+    public static final String CREATE_AUTONOMOUS_RUNS = """
+            CREATE TABLE IF NOT EXISTS autonomous_runs (
+                run_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                goal_text TEXT,
+                status TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                last_update TEXT NOT NULL,
+                completed_at TEXT,
+                current_plan_revision INTEGER DEFAULT 0,
+                active_node_id TEXT,
+                completed_nodes_json TEXT,
+                failed_nodes_json TEXT,
+                recovery_count INTEGER DEFAULT 0,
+                replan_count INTEGER DEFAULT 0,
+                tool_call_count INTEGER DEFAULT 0,
+                requirement_states_json TEXT,
+                completion_state TEXT,
+                checkpoint_ref TEXT,
+                final_validation_result_json TEXT,
+                plan_json TEXT,
+                FOREIGN KEY (project_id) REFERENCES projects(project_id)
+            )
+            """;
+
+    // ── Durable event journal ──────────────────────────────────────────
+
+    public static final String CREATE_RUN_EVENTS = """
+            CREATE TABLE IF NOT EXISTS run_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id TEXT NOT NULL UNIQUE,
+                sequence INTEGER NOT NULL,
+                timestamp TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                agent_run_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                payload TEXT,
+                FOREIGN KEY (project_id) REFERENCES projects(project_id)
+            )
+            """;
+
     // ── Indexes ────────────────────────────────────────────────────────
 
     public static final String[] CREATE_INDEXES = {
@@ -144,7 +189,11 @@ public final class MemorySchema {
         "CREATE INDEX IF NOT EXISTS idx_memory_project_key ON memory_entries(project_id, key)",
         "CREATE INDEX IF NOT EXISTS idx_scripts_project ON scripts(project_id)",
         "CREATE INDEX IF NOT EXISTS idx_assets_project ON assets(project_id)",
-        "CREATE INDEX IF NOT EXISTS idx_arch_project ON architecture_snapshots(project_id)"
+        "CREATE INDEX IF NOT EXISTS idx_arch_project ON architecture_snapshots(project_id)",
+        "CREATE INDEX IF NOT EXISTS idx_runs_project ON autonomous_runs(project_id)",
+        "CREATE INDEX IF NOT EXISTS idx_runs_status ON autonomous_runs(status)",
+        "CREATE INDEX IF NOT EXISTS idx_events_run_seq ON run_events(agent_run_id, sequence)",
+        "CREATE INDEX IF NOT EXISTS idx_events_project_time ON run_events(project_id, timestamp)"
     };
 
     /** All table DDL statements in order. */
@@ -156,6 +205,8 @@ public final class MemorySchema {
         CREATE_SCRIPTS,
         CREATE_ASSETS,
         CREATE_ARCHITECTURE_SNAPSHOTS,
-        CREATE_USER_PREFERENCES
+        CREATE_USER_PREFERENCES,
+        CREATE_AUTONOMOUS_RUNS,
+        CREATE_RUN_EVENTS
     };
 }

@@ -35,9 +35,13 @@
             <span class="status-dot"></span>
             <span id="badge-provider-text" class="status-label">AI Provider</span>
           </div>
+          <div id="badge-breaker" class="status-pill status-online" title="Provider Circuit Breaker State">
+            <span class="status-dot"></span>
+            <span id="badge-breaker-text" class="status-label">Breaker: CLOSED</span>
+          </div>
         </div>
 
-        <button id="btn-toggle-autonomy" class="btn btn-primary" title="Phase 9 Long-Horizon Autonomous Development">
+        <button id="btn-toggle-autonomy" class="btn btn-primary" title="Phase 9/10 Long-Horizon Autonomy & Diagnostics">
           ⚡ Autonomy DAG
         </button>
 
@@ -53,12 +57,12 @@
       </div>
     </header>
 
-    <!-- Phase 9 Autonomy Dashboard / DAG Panel -->
+    <!-- Phase 9/10 Autonomy Dashboard / DAG Panel -->
     <div id="autonomy-panel" class="autonomy-panel hidden">
       <div class="autonomy-header">
         <div class="autonomy-title">
           <span class="autonomy-icon">⚡</span>
-          <h3>Phase 9 Long-Horizon Autonomy Engine</h3>
+          <h3>Autonomous Engine & Diagnostics</h3>
           <span id="autonomy-status-badge" class="badge badge-idle">IDLE</span>
         </div>
         <div class="autonomy-actions">
@@ -105,9 +109,56 @@
           </div>
         </div>
 
-        <div class="autonomy-dag-container">
-          <div id="autonomy-nodes-list" class="autonomy-nodes-list">
-            <div class="empty-dag-note">No active long-horizon autonomous run. Start a run or enter a full game prompt.</div>
+        <div class="autonomy-nav-tabs">
+          <button id="tab-btn-dag" class="tab-nav-btn active">Plan DAG</button>
+          <button id="tab-btn-journal" class="tab-nav-btn">Event Journal (v2)</button>
+          <button id="tab-btn-diagnostics" class="tab-nav-btn">System Metrics</button>
+        </div>
+
+        <div id="tab-content-dag" class="autonomy-tab-content active">
+          <div class="autonomy-dag-container">
+            <div id="autonomy-nodes-list" class="autonomy-nodes-list">
+              <div class="empty-dag-note">No active long-horizon autonomous run. Start a run or enter a full game prompt.</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-content-journal" class="autonomy-tab-content hidden">
+          <div class="autonomy-journal-container">
+            <div id="autonomy-journal-list" class="autonomy-journal-list">
+              <div class="empty-dag-note">No events recorded for active run.</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-content-diagnostics" class="autonomy-tab-content hidden">
+          <div class="autonomy-diagnostics-container">
+            <div class="diag-grid">
+              <div class="diag-card">
+                <span class="diag-card-title">Total Runs</span>
+                <span id="diag-total-runs" class="diag-card-val">0</span>
+              </div>
+              <div class="diag-card">
+                <span class="diag-card-title">Active Runs</span>
+                <span id="diag-active-runs" class="diag-card-val">0</span>
+              </div>
+              <div class="diag-card">
+                <span class="diag-card-title">Success Rate</span>
+                <span id="diag-success-rate" class="diag-card-val">100%</span>
+              </div>
+              <div class="diag-card">
+                <span class="diag-card-title">Recovery Cycles</span>
+                <span id="diag-recoveries" class="diag-card-val">0</span>
+              </div>
+              <div class="diag-card">
+                <span class="diag-card-title">Unity Disconnects</span>
+                <span id="diag-disconnects" class="diag-card-val">0</span>
+              </div>
+              <div class="diag-card">
+                <span class="diag-card-title">Circuit Breaker Trips</span>
+                <span id="diag-breaker-trips" class="diag-card-val">0</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

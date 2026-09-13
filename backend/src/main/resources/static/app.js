@@ -21,6 +21,8 @@
   const badgeUnity = document.getElementById('badge-unity');
   const badgeProvider = document.getElementById('badge-provider');
   const badgeProviderText = document.getElementById('badge-provider-text');
+  const badgeBreaker = document.getElementById('badge-breaker');
+  const badgeBreakerText = document.getElementById('badge-breaker-text');
 
   const goalBanner = document.getElementById('goal-banner');
   const goalDescription = document.getElementById('goal-description');
@@ -65,6 +67,7 @@
     setInterval(pollStatus, 4000);
     loadSessionHistory(currentSessionId);
     loadProviderConfig();
+    restoreActiveAutonomyRun();
   }
 
   function setupEventListeners() {
@@ -688,6 +691,51 @@
       updateBadge(badgeUnity, false, 'Unity');
       updateBadge(badgeProvider, false, 'AI Provider');
     }
+
+    // Phase 10 Metrics & Circuit Breaker polling
+    try {
+      const mRes = await fetch('/api/metrics');
+      if (mRes.ok) {
+        const mData = await mRes.json();
+        updateCircuitBreakerBadge(mData.circuitBreakerStatus || 'CLOSED');
+        updateDiagnosticsGrid(mData);
+      }
+    } catch (e) {
+      console.debug('Metrics poll error:', e);
+    }
+  }
+
+  function updateCircuitBreakerBadge(state) {
+    if (!badgeBreaker) return;
+    const s = (state || 'CLOSED').toUpperCase();
+    if (s === 'CLOSED') {
+      badgeBreaker.className = 'status-pill status-online';
+      if (badgeBreakerText) badgeBreakerText.textContent = 'Breaker: CLOSED';
+    } else if (s === 'HALF_OPEN') {
+      badgeBreaker.className = 'status-pill status-checking';
+      if (badgeBreakerText) badgeBreakerText.textContent = 'Breaker: HALF_OPEN';
+    } else {
+      badgeBreaker.className = 'status-pill status-offline';
+      if (badgeBreakerText) badgeBreakerText.textContent = 'Breaker: OPEN';
+    }
+  }
+
+  function updateDiagnosticsGrid(m) {
+    const elTotal = document.getElementById('diag-total-runs');
+    if (elTotal) elTotal.textContent = m.totalRunsInitiated != null ? m.totalRunsInitiated : 0;
+    const elActive = document.getElementById('diag-active-runs');
+    if (elActive) elActive.textContent = m.activeRunsCount != null ? m.activeRunsCount : 0;
+    const elSuccess = document.getElementById('diag-success-rate');
+    if (elSuccess) {
+      const rate = (m.successRate != null) ? (m.successRate * 100).toFixed(1) + '%' : '100%';
+      elSuccess.textContent = rate;
+    }
+    const elRec = document.getElementById('diag-recoveries');
+    if (elRec) elRec.textContent = m.totalRecoveriesTriggered != null ? m.totalRecoveriesTriggered : 0;
+    const elDisc = document.getElementById('diag-disconnects');
+    if (elDisc) elDisc.textContent = m.totalUnityDisconnects != null ? m.totalUnityDisconnects : 0;
+    const elTrips = document.getElementById('diag-breaker-trips');
+    if (elTrips) elTrips.textContent = m.circuitBreakerTrips != null ? m.circuitBreakerTrips : 0;
   }
 
   function updateBadge(el, isOnline, label) {
@@ -882,8 +930,8 @@
     return text;
   }
 
-  // --- Phase 9 Autonomy Engine Dashboard Logic ---
-  let activeAutonomyRunId = null;
+  // --- Phase 9/10 Autonomy Engine Dashboard & Recovery Logic ---
+  let activeAutonomyRunId = localStorage.getItem('active_autonomy_run') || null;
 
   const btnToggleAutonomy = document.getElementById('btn-toggle-autonomy');
   const autonomyPanel = document.getElementById('autonomy-panel');
@@ -898,6 +946,40 @@
   const interventionBanner = document.getElementById('intervention-banner');
   const interventionMessage = document.getElementById('intervention-message');
   const nodesListContainer = document.getElementById('autonomy-nodes-list');
+
+  // Tab Navigation Elements
+  const tabBtnDag = document.getElementById('tab-btn-dag');
+  const tabBtnJournal = document.getElementById('tab-btn-journal');
+  const tabBtnDiagnostics = document.getElementById('tab-btn-diagnostics');
+  const tabContentDag = document.getElementById('tab-content-dag');
+  const tabContentJournal = document.getElementById('tab-content-journal');
+  const tabContentDiagnostics = document.getElementById('tab-content-diagnostics');
+
+  function switchAutonomyTab(tabName) {
+    [tabBtnDag, tabBtnJournal, tabBtnDiagnostics].forEach(btn => btn && btn.classList.remove('active'));
+    [tabContentDag, tabContentJournal, tabContentDiagnostics].forEach(cnt => {
+      if (cnt) {
+        cnt.classList.remove('active');
+        cnt.classList.add('hidden');
+      }
+    });
+
+    if (tabName === 'dag') {
+      if (tabBtnDag) tabBtnDag.classList.add('active');
+      if (tabContentDag) { tabContentDag.classList.remove('hidden'); tabContentDag.classList.add('active'); }
+    } else if (tabName === 'journal') {
+      if (tabBtnJournal) tabBtnJournal.classList.add('active');
+      if (tabContentJournal) { tabContentJournal.classList.remove('hidden'); tabContentJournal.classList.add('active'); }
+      if (activeAutonomyRunId) loadEventJournal(activeAutonomyRunId);
+    } else if (tabName === 'diagnostics') {
+      if (tabBtnDiagnostics) tabBtnDiagnostics.classList.add('active');
+      if (tabContentDiagnostics) { tabContentDiagnostics.classList.remove('hidden'); tabContentDiagnostics.classList.add('active'); }
+    }
+  }
+
+  if (tabBtnDag) tabBtnDag.addEventListener('click', () => switchAutonomyTab('dag'));
+  if (tabBtnJournal) tabBtnJournal.addEventListener('click', () => switchAutonomyTab('journal'));
+  if (tabBtnDiagnostics) tabBtnDiagnostics.addEventListener('click', () => switchAutonomyTab('diagnostics'));
 
   if (btnToggleAutonomy && autonomyPanel) {
     btnToggleAutonomy.addEventListener('click', () => {
@@ -914,13 +996,32 @@
     });
   }
 
+  async function restoreActiveAutonomyRun() {
+    const saved = localStorage.getItem('active_autonomy_run');
+    if (saved) {
+      activeAutonomyRunId = saved;
+      await refreshAutonomyState(saved);
+    }
+  }
+
   async function refreshAutonomyState(runId) {
     if (!runId) return;
     try {
-      const res = await fetch(`/api/autonomy/${runId}/state`);
-      if (!res.ok) return;
-      const state = await res.json();
-      renderAutonomyDashboard(state);
+      // 1. Try fetching in-memory active state
+      const res = await fetch(`/api/autonomy/${encodeURIComponent(runId)}/state`);
+      if (res.ok) {
+        const state = await res.json();
+        renderAutonomyDashboard(state);
+      } else {
+        // 2. Fallback to persisted SQLite record if backend was restarted
+        const recRes = await fetch(`/api/autonomy/runs/${encodeURIComponent(runId)}/record`);
+        if (recRes.ok) {
+          const record = await recRes.json();
+          renderAutonomyFromRecord(record);
+        }
+      }
+      // Always load durable event journal history
+      loadEventJournal(runId);
     } catch (err) {
       console.warn('Failed to refresh autonomy state:', err);
     }
@@ -929,6 +1030,7 @@
   function renderAutonomyDashboard(state) {
     if (!state) return;
     activeAutonomyRunId = state.runId;
+    localStorage.setItem('active_autonomy_run', state.runId);
 
     if (autonomyStatusBadge) {
       autonomyStatusBadge.textContent = state.status || 'IDLE';
@@ -990,6 +1092,70 @@
         nodesListContainer.appendChild(item);
       });
     }
+  }
+
+  function renderAutonomyFromRecord(record) {
+    if (!record) return;
+    activeAutonomyRunId = record.runId;
+
+    if (autonomyStatusBadge) {
+      autonomyStatusBadge.textContent = record.status || 'IDLE';
+      autonomyStatusBadge.className = `badge badge-${(record.status || 'idle').toLowerCase()}`;
+    }
+
+    const isRunning = record.status === 'RUNNING';
+    const isPaused = record.status === 'PAUSED';
+    if (btnAutonomyStep) btnAutonomyStep.disabled = !isRunning;
+    if (btnAutonomyPause) btnAutonomyPause.disabled = !isRunning;
+    if (btnAutonomyResume) btnAutonomyResume.disabled = !isPaused;
+
+    const mNodes = document.getElementById('metric-nodes');
+    if (mNodes) mNodes.textContent = `${record.completedNodes ? record.completedNodes.length : 0}/-`;
+
+    const mReplans = document.getElementById('metric-replans');
+    if (mReplans) mReplans.textContent = record.currentPlanRevision != null ? record.currentPlanRevision : 0;
+
+    const mCheckpoint = document.getElementById('metric-checkpoint');
+    if (mCheckpoint) mCheckpoint.textContent = record.checkpointRef ? record.checkpointRef.substring(0, 16) + '...' : 'None';
+  }
+
+  async function loadEventJournal(runId) {
+    const listEl = document.getElementById('autonomy-journal-list');
+    if (!listEl || !runId) return;
+    try {
+      const res = await fetch(`/api/autonomy/runs/${encodeURIComponent(runId)}/events`);
+      if (res.ok) {
+        const events = await res.json();
+        renderEventJournal(events);
+      }
+    } catch (e) {
+      console.warn('Failed to load event journal:', e);
+    }
+  }
+
+  function renderEventJournal(events) {
+    const listEl = document.getElementById('autonomy-journal-list');
+    if (!listEl) return;
+    if (!events || events.length === 0) {
+      listEl.innerHTML = '<div class="empty-dag-note">No events recorded yet for this run.</div>';
+      return;
+    }
+
+    listEl.innerHTML = '';
+    events.forEach(evt => {
+      const item = document.createElement('div');
+      item.className = `journal-item evt-${escapeHtml(evt.eventType)}`;
+      const timeStr = evt.createdAt ? new Date(evt.createdAt).toLocaleTimeString() : '';
+      const payloadStr = evt.payload ? (typeof evt.payload === 'string' ? evt.payload : JSON.stringify(evt.payload)) : '';
+
+      item.innerHTML = `
+        <span class="journal-seq">#${evt.sequenceNumber != null ? evt.sequenceNumber : ''}</span>
+        <span class="journal-time">${escapeHtml(timeStr)}</span>
+        <span class="journal-type">${escapeHtml(evt.eventType || '')}</span>
+        <span class="journal-payload" title="${escapeHtml(payloadStr)}">${escapeHtml(payloadStr.substring(0, 100))}${payloadStr.length > 100 ? '...' : ''}</span>
+      `;
+      listEl.appendChild(item);
+    });
   }
 
   if (btnAutonomyStep) {

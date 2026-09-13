@@ -1097,5 +1097,152 @@ textarea#user-prompt {
   text-transform: uppercase;
 }
 
+/* Phase 10 Autonomy Tabs & Views */
+.autonomy-nav-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 6px;
+}
 
+.tab-nav-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
 
+.tab-nav-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-nav-btn.active {
+  color: var(--accent-blue);
+  background: rgba(56, 139, 253, 0.12);
+}
+
+.autonomy-tab-content.hidden {
+  display: none;
+}
+
+.autonomy-tab-content.active {
+  display: block;
+}
+
+/* Phase 10 Event Journal */
+.autonomy-journal-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.autonomy-journal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.journal-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--bg-panel);
+  border-radius: 6px;
+  font-size: 12px;
+  border-left: 3px solid var(--accent-blue);
+}
+
+.journal-item.evt-RUN_COMPLETED,
+.journal-item.evt-NODE_COMPLETED {
+  border-left-color: var(--accent-green-bright);
+}
+
+.journal-item.evt-RUN_FAILED,
+.journal-item.evt-CIRCUIT_BREAKER_TRIPPED,
+.journal-item.evt-NODE_FAILED {
+  border-left-color: var(--accent-red);
+}
+
+.journal-item.evt-WAITING_FOR_UNITY,
+.journal-item.evt-WAITING_FOR_PROVIDER,
+.journal-item.evt-RECOVERY_TRIGGERED {
+  border-left-color: var(--accent-amber);
+}
+
+.journal-seq {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 32px;
+}
+
+.journal-type {
+  font-weight: 600;
+  font-size: 11px;
+  min-width: 140px;
+  color: var(--text-main);
+}
+
+.journal-time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  min-width: 60px;
+}
+
+.journal-payload {
+  flex: 1;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+/* Phase 10 Diagnostics Grid */
+.autonomy-diagnostics-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.diag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+}
+
+.diag-card {
+  background: var(--bg-panel);
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.diag-card-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.diag-card-val {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-main);
+}
