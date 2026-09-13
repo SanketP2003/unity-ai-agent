@@ -1,25 +1,53 @@
 package com.unityagent.tools;
 
+import com.unityagent.agent.security.ScriptSafetyValidator;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
  * Registry of tool definitions for the Autonomous Unity Agent.
- * Contains tool metadata, documentation, and parameter validation.
- * Each inner class is a Spring @Component that self-registers into ToolRegistry.
+ * Contains tool metadata, documentation, parameter validation, execution permissions,
+ * and JSON schemas for LLM tool calling.
  */
 public class UnityTools {
+
+    // --- Schema Builder Utilities ---
+
+    private static Map<String, Object> vector3Schema(String description) {
+        Map<String, Object> props = new LinkedHashMap<>();
+        props.put("x", Map.of("type", "number", "description", "X coordinate"));
+        props.put("y", Map.of("type", "number", "description", "Y coordinate"));
+        props.put("z", Map.of("type", "number", "description", "Z coordinate"));
+
+        Map<String, Object> s = new LinkedHashMap<>();
+        s.put("type", "object");
+        s.put("description", description);
+        s.put("properties", props);
+        s.put("required", List.of("x", "y", "z"));
+        return s;
+    }
+
+    private static Map<String, Object> colorSchema(String description) {
+        return Map.of(
+                "type", "string",
+                "description", description + " (Hex color string e.g. '#FF0000' or '#33AA33')"
+        );
+    }
 
     // --- Validation Utilities ---
 
     private static String checkTarget(Map<String, Object> parameters) {
-        if (parameters == null || !parameters.containsKey("target") || parameters.get("target") == null) {
-            return "Parameter 'target' (GameObject name or path) is required";
+        if (parameters == null || (!parameters.containsKey("target") && !parameters.containsKey("objectId"))) {
+            return "Parameter 'target' or 'objectId' is required";
         }
-        if (!(parameters.get("target") instanceof String s) || s.isBlank()) {
-            return "Parameter 'target' must be a non-empty string";
+        Object obj = parameters.get("objectId");
+        if (obj == null) obj = parameters.get("target");
+        if (!(obj instanceof String s) || s.isBlank()) {
+            return "Parameter 'target' or 'objectId' must be a non-empty string";
         }
         return null;
     }
@@ -71,6 +99,17 @@ public class UnityTools {
         }
 
         @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            return Map.of("type", "object", "properties", Map.of());
+        }
+
+        @Override
         public String validate(Map<String, Object> parameters) {
             return null;
         }
@@ -92,9 +131,23 @@ public class UnityTools {
         }
 
         @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("rootOnly", Map.of("type", "boolean", "description", "If true, only returns root-level GameObjects"));
+            return Map.of("type", "object", "properties", props);
+        }
+
+        @Override
         public String validate(Map<String, Object> parameters) {
             if (parameters != null && parameters.containsKey("rootOnly")) {
-                if (!(parameters.get("rootOnly") instanceof Boolean)) {
+                Object val = parameters.get("rootOnly");
+                if (!(val instanceof Boolean) && !"true".equalsIgnoreCase(String.valueOf(val)) && !"false".equalsIgnoreCase(String.valueOf(val))) {
                     return "Parameter 'rootOnly' must be a boolean";
                 }
             }
@@ -109,7 +162,24 @@ public class UnityTools {
 
         @Override
         public String description() {
-            return "Creates a new scene in the Unity Editor with optional default setup (EmptyScene or DefaultGame).";
+            return "Creates a new scene in the Unity Editor with optional default setup (EmptyScene or DefaultGameObjects).";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SUPERVISED; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("setup", Map.of(
+                    "type", "string",
+                    "enum", List.of("EmptyScene", "DefaultGameObjects"),
+                    "description", "Scene template setup: 'EmptyScene' or 'DefaultGameObjects'"
+            ));
+            return Map.of("type", "object", "properties", props);
         }
 
         @Override
@@ -132,6 +202,19 @@ public class UnityTools {
         @Override
         public String description() {
             return "Saves the active Unity scene to the asset database (optional scenePath, e.g. 'Assets/Scenes/Main.unity').";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("scenePath", Map.of("type", "string", "description", "Target path ending with .unity (optional)"));
+            return Map.of("type", "object", "properties", props);
         }
 
         @Override
@@ -162,6 +245,33 @@ public class UnityTools {
         public String description() {
             return "Creates a standard 3D primitive (Cube, Sphere, Capsule, Cylinder, Plane, Quad) " +
                    "with customizable name, position, rotation, scale, and optional parent.";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("type", Map.of(
+                    "type", "string",
+                    "enum", List.of("Cube", "Sphere", "Capsule", "Cylinder", "Plane", "Quad"),
+                    "description", "Type of 3D primitive"
+            ));
+            props.put("name", Map.of("type", "string", "description", "Unique name for the GameObject"));
+            props.put("position", vector3Schema("World position vector"));
+            props.put("rotation", vector3Schema("Euler angles rotation vector in degrees"));
+            props.put("scale", vector3Schema("Scale vector (default 1,1,1)"));
+            props.put("parent", Map.of("type", "string", "description", "Optional name of parent GameObject"));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            schema.put("required", List.of("type"));
+            return schema;
         }
 
         @Override
@@ -198,6 +308,28 @@ public class UnityTools {
         }
 
         @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("name", Map.of("type", "string", "description", "Name for the empty GameObject"));
+            props.put("position", vector3Schema("World position"));
+            props.put("rotation", vector3Schema("Euler rotation in degrees"));
+            props.put("scale", vector3Schema("Scale vector"));
+            props.put("parent", Map.of("type", "string", "description", "Optional parent name"));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            schema.put("required", List.of("name"));
+            return schema;
+        }
+
+        @Override
         public String validate(Map<String, Object> parameters) {
             if (parameters == null || !parameters.containsKey("name")) {
                 return "Parameter 'name' is required";
@@ -227,6 +359,28 @@ public class UnityTools {
         @Override
         public String description() {
             return "Updates the position, rotation (Euler angles), and/or scale of an existing GameObject.";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("target", Map.of("type", "string", "description", "Target GameObject name or path"));
+            props.put("position", vector3Schema("Position vector"));
+            props.put("rotation", vector3Schema("Euler rotation in degrees"));
+            props.put("scale", vector3Schema("Scale vector"));
+            props.put("space", Map.of("type", "string", "enum", List.of("World", "Local"), "description", "Coordinate space ('World' or 'Local')"));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            schema.put("required", List.of("target"));
+            return schema;
         }
 
         @Override
@@ -269,6 +423,27 @@ public class UnityTools {
         }
 
         @Override
+        public ToolPermission permission() { return ToolPermission.DESTRUCTIVE; }
+
+        @Override
+        public boolean isDestructive() { return true; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("target", Map.of("type", "string", "description", "Name or path of the GameObject to destroy"));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            schema.put("required", List.of("target"));
+            return schema;
+        }
+
+        @Override
         public String validate(Map<String, Object> parameters) {
             return checkTarget(parameters);
         }
@@ -282,6 +457,26 @@ public class UnityTools {
         @Override
         public String description() {
             return "Sets the parent GameObject for a target GameObject, or unparents if parent is null/empty.";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("target", Map.of("type", "string", "description", "Child GameObject to reparent"));
+            props.put("parent", Map.of("type", "string", "description", "Parent GameObject name (empty to unparent)"));
+            props.put("worldPositionStays", Map.of("type", "boolean", "description", "Keep world position (default true)"));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            schema.put("required", List.of("target"));
+            return schema;
         }
 
         @Override
@@ -302,6 +497,25 @@ public class UnityTools {
         @Override
         public String description() {
             return "Adds a component (e.g. Rigidbody, BoxCollider, AudioSource, etc.) to the target GameObject.";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("target", Map.of("type", "string", "description", "Target GameObject name"));
+            props.put("componentType", Map.of("type", "string", "description", "Component class name (e.g. 'Rigidbody', 'BoxCollider', 'SphereCollider', 'AudioSource')"));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            schema.put("required", List.of("target", "componentType"));
+            return schema;
         }
 
         @Override
@@ -327,6 +541,27 @@ public class UnityTools {
         @Override
         public String description() {
             return "Sets a property or field on an attached component (e.g. isKinematic, mass, useGravity, isTrigger).";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("target", Map.of("type", "string", "description", "Target GameObject name"));
+            props.put("componentType", Map.of("type", "string", "description", "Component type name (e.g. 'Rigidbody')"));
+            props.put("property", Map.of("type", "string", "description", "Field or property name (e.g. 'isKinematic', 'mass', 'useGravity', 'isTrigger')"));
+            props.put("value", Map.of("description", "Value to assign (boolean, number, string, or vector)"));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            schema.put("required", List.of("target", "componentType", "property", "value"));
+            return schema;
         }
 
         @Override
@@ -358,6 +593,28 @@ public class UnityTools {
         }
 
         @Override
+        public ToolPermission permission() { return ToolPermission.DESTRUCTIVE; }
+
+        @Override
+        public boolean isDestructive() { return true; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("target", Map.of("type", "string", "description", "Target GameObject name"));
+            props.put("componentType", Map.of("type", "string", "description", "Component type name to remove"));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            schema.put("required", List.of("target", "componentType"));
+            return schema;
+        }
+
+        @Override
         public String validate(Map<String, Object> parameters) {
             String targetErr = checkTarget(parameters);
             if (targetErr != null) return targetErr;
@@ -384,6 +641,25 @@ public class UnityTools {
         }
 
         @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("target", Map.of("type", "string", "description", "Target GameObject name"));
+            props.put("color", colorSchema("Color for material"));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            schema.put("required", List.of("target", "color"));
+            return schema;
+        }
+
+        @Override
         public String validate(Map<String, Object> parameters) {
             String targetErr = checkTarget(parameters);
             if (targetErr != null) return targetErr;
@@ -403,6 +679,27 @@ public class UnityTools {
         @Override
         public String description() {
             return "Creates a Material asset under Assets/Materials with color, metallic, and smoothness.";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("name", Map.of("type", "string", "description", "Material asset name (e.g. 'RedGlow')"));
+            props.put("color", colorSchema("Base material color"));
+            props.put("metallic", Map.of("type", "number", "description", "Metallic value (0.0 to 1.0)"));
+            props.put("smoothness", Map.of("type", "number", "description", "Smoothness value (0.0 to 1.0)"));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            schema.put("required", List.of("name"));
+            return schema;
         }
 
         @Override
@@ -441,6 +738,25 @@ public class UnityTools {
         }
 
         @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("target", Map.of("type", "string", "description", "Target GameObject name"));
+            props.put("materialPath", Map.of("type", "string", "description", "Material asset path (e.g. 'Assets/Materials/Red.mat')"));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            schema.put("required", List.of("target", "materialPath"));
+            return schema;
+        }
+
+        @Override
         public String validate(Map<String, Object> parameters) {
             String targetErr = checkTarget(parameters);
             if (targetErr != null) return targetErr;
@@ -469,6 +785,34 @@ public class UnityTools {
         @Override
         public String description() {
             return "Creates a light (Directional, Point, Spot) with configurable color, intensity, range, and transform.";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("lightType", Map.of(
+                    "type", "string",
+                    "enum", List.of("Directional", "Point", "Spot"),
+                    "description", "Light type"
+            ));
+            props.put("name", Map.of("type", "string", "description", "Light GameObject name"));
+            props.put("color", colorSchema("Light color"));
+            props.put("intensity", Map.of("type", "number", "description", "Light intensity"));
+            props.put("range", Map.of("type", "number", "description", "Light range (Point/Spot)"));
+            props.put("position", vector3Schema("Light position"));
+            props.put("rotation", vector3Schema("Light Euler rotation"));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            schema.put("required", List.of("lightType"));
+            return schema;
         }
 
         @Override
@@ -511,6 +855,27 @@ public class UnityTools {
         }
 
         @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("name", Map.of("type", "string", "description", "Camera GameObject name"));
+            props.put("position", vector3Schema("Camera position"));
+            props.put("rotation", vector3Schema("Camera Euler rotation"));
+            props.put("fieldOfView", Map.of("type", "number", "description", "Field of view angle"));
+            props.put("isMainCamera", Map.of("type", "boolean", "description", "Tag as MainCamera"));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            return schema;
+        }
+
+        @Override
         public String validate(Map<String, Object> parameters) {
             String posErr = checkVector3(parameters.get("position"), "position");
             if (posErr != null) return posErr;
@@ -541,11 +906,30 @@ public class UnityTools {
         }
 
         @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("play", Map.of("type", "boolean", "description", "True to enter play mode, false to return to edit mode"));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            schema.put("required", List.of("play"));
+            return schema;
+        }
+
+        @Override
         public String validate(Map<String, Object> parameters) {
             if (parameters == null || !parameters.containsKey("play")) {
                 return "Parameter 'play' (boolean) is required";
             }
-            if (!(parameters.get("play") instanceof Boolean)) {
+            Object val = parameters.get("play");
+            if (!(val instanceof Boolean) && !"true".equalsIgnoreCase(String.valueOf(val)) && !"false".equalsIgnoreCase(String.valueOf(val))) {
                 return "Parameter 'play' must be a boolean";
             }
             return null;
@@ -560,6 +944,28 @@ public class UnityTools {
         @Override
         public String description() {
             return "Retrieves recent console messages, warnings, and errors from the Unity Editor console.";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("count", Map.of("type", "integer", "description", "Maximum number of logs to retrieve (default 50)"));
+            props.put("logType", Map.of(
+                    "type", "string",
+                    "enum", List.of("All", "Error", "Warning", "Log"),
+                    "description", "Filter logs by type"
+            ));
+
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            return schema;
         }
 
         @Override
@@ -578,4 +984,429 @@ public class UnityTools {
             return null;
         }
     }
+
+    // ==========================================
+    // Phase 3: Unity Perception Tools
+    // ==========================================
+
+    @Component
+    public static class GetActiveScene implements Tool {
+        @Override
+        public String name() { return "get_active_scene"; }
+
+        @Override
+        public String description() {
+            return "Get details about the currently active Unity scene, including name, path, dirty state, and root object count.";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            return Map.of("type", "object", "properties", Map.of());
+        }
+
+        @Override
+        public String validate(Map<String, Object> parameters) {
+            return null;
+        }
+    }
+
+    @Component
+    public static class GetSelectedObject implements Tool {
+        @Override
+        public String name() { return "get_selected_object"; }
+
+        @Override
+        public String description() {
+            return "Get details about the currently selected GameObject in the Unity Editor (objectId, name, hierarchy path, active state, components, and transform).";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            return Map.of("type", "object", "properties", Map.of());
+        }
+
+        @Override
+        public String validate(Map<String, Object> parameters) {
+            return null;
+        }
+    }
+
+    @Component
+    public static class GetObjectComponents implements Tool {
+        @Override
+        public String name() { return "get_object_components"; }
+
+        @Override
+        public String description() {
+            return "Get the list of components attached to a GameObject specified by name or objectId.";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("target", Map.of("type", "string", "description", "GameObject name, hierarchy path, or objectId (e.g. 'obj_123')"));
+            props.put("objectId", Map.of("type", "string", "description", "Optional explicit objectId (e.g. 'obj_123')"));
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            return schema;
+        }
+
+        @Override
+        public String validate(Map<String, Object> parameters) {
+            return checkTarget(parameters);
+        }
+    }
+
+    @Component
+    public static class GetObjectTransform implements Tool {
+        @Override
+        public String name() { return "get_object_transform"; }
+
+        @Override
+        public String description() {
+            return "Get complete transform information (position, rotation, scale, local transform, forward/up/right vectors, parent, child count) of a GameObject by name or objectId.";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("target", Map.of("type", "string", "description", "GameObject name, hierarchy path, or objectId (e.g. 'obj_123')"));
+            props.put("objectId", Map.of("type", "string", "description", "Optional explicit objectId (e.g. 'obj_123')"));
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            return schema;
+        }
+
+        @Override
+        public String validate(Map<String, Object> parameters) {
+            return checkTarget(parameters);
+        }
+    }
+
+    @Component
+    public static class GetPlayModeState implements Tool {
+        @Override
+        public String name() { return "get_play_mode_state"; }
+
+        @Override
+        public String description() {
+            return "Get the current Unity Editor execution state (isPlaying, isPaused, isCompiling, state).";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            return Map.of("type", "object", "properties", Map.of());
+        }
+
+        @Override
+        public String validate(Map<String, Object> parameters) {
+            return null;
+        }
+    }
+
+    @Component
+    public static class GetConsoleErrors implements Tool {
+        @Override
+        public String name() { return "get_console_errors"; }
+
+        @Override
+        public String description() {
+            return "Get recent console errors and exceptions from the Unity Editor console.";
+        }
+
+        @Override
+        public ToolPermission permission() { return ToolPermission.SAFE; }
+
+        @Override
+        public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+
+        @Override
+        public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("count", Map.of("type", "integer", "description", "Maximum number of recent errors to retrieve (default 20, max 100)"));
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            schema.put("properties", props);
+            return schema;
+        }
+
+        @Override
+        public String validate(Map<String, Object> parameters) {
+            if (parameters != null && parameters.containsKey("count")) {
+                Object val = parameters.get("count");
+                if (!(val instanceof Number n) || n.intValue() <= 0) {
+                    return "Parameter 'count' must be a positive integer";
+                }
+            }
+            return null;
+        }
+    }
+
+    // ==========================================
+    // Phase 6 Tools: Script Management
+    // ==========================================
+
+    @Component
+    public static class CreateScript implements Tool {
+        private static final ScriptSafetyValidator validator = new ScriptSafetyValidator();
+
+        @Override public String name() { return "create_script"; }
+        @Override public String description() {
+            return "Create a new C# script inside Assets/ with strict path sandboxing and dangerous C# API safety validation.";
+        }
+        @Override public ToolPermission permission() { return ToolPermission.SUPERVISED; }
+        @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("path", Map.of("type", "string", "description", "Script path starting with Assets/ and ending with .cs (e.g. 'Assets/Scripts/PlayerController.cs')"));
+            props.put("content", Map.of("type", "string", "description", "Complete C# source code"));
+            return Map.of("type", "object", "properties", props, "required", List.of("path", "content"));
+        }
+
+        @Override public String validate(Map<String, Object> parameters) {
+            if (parameters == null || !parameters.containsKey("path") || !parameters.containsKey("content")) {
+                return "Parameters 'path' and 'content' are required";
+            }
+            String path = String.valueOf(parameters.get("path"));
+            String content = String.valueOf(parameters.get("content"));
+            ScriptSafetyValidator.ValidationResult res = validator.validate(path, content);
+            return res.isValid() ? null : res.getViolationMessage();
+        }
+    }
+
+    @Component
+    public static class ReadScript implements Tool {
+        private static final ScriptSafetyValidator validator = new ScriptSafetyValidator();
+
+        @Override public String name() { return "read_script"; }
+        @Override public String description() {
+            return "Read the C# source code, line count, and SHA-256 hash of a script inside Assets/.";
+        }
+        @Override public ToolPermission permission() { return ToolPermission.SAFE; }
+        @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+
+        @Override public Map<String, Object> inputSchema() {
+            return Map.of("type", "object", "properties", Map.of("path", Map.of("type", "string", "description", "Script path in Assets/")), "required", List.of("path"));
+        }
+
+        @Override public String validate(Map<String, Object> parameters) {
+            if (parameters == null || !parameters.containsKey("path")) return "Parameter 'path' is required";
+            ScriptSafetyValidator.ValidationResult res = validator.validatePath(String.valueOf(parameters.get("path")));
+            return res.isValid() ? null : res.getViolationMessage();
+        }
+    }
+
+    @Component
+    public static class UpdateScript implements Tool {
+        private static final ScriptSafetyValidator validator = new ScriptSafetyValidator();
+
+        @Override public String name() { return "update_script"; }
+        @Override public String description() {
+            return "Update an existing C# script using optimistic concurrency. Requires previousHash matching current file hash.";
+        }
+        @Override public ToolPermission permission() { return ToolPermission.SUPERVISED; }
+        @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("path", Map.of("type", "string", "description", "Script path in Assets/"));
+            props.put("previousHash", Map.of("type", "string", "description", "Current SHA-256 hash of the script from read_script"));
+            props.put("content", Map.of("type", "string", "description", "Updated C# source code"));
+            return Map.of("type", "object", "properties", props, "required", List.of("path", "content"));
+        }
+
+        @Override public String validate(Map<String, Object> parameters) {
+            if (parameters == null || !parameters.containsKey("path") || !parameters.containsKey("content")) {
+                return "Parameters 'path' and 'content' are required";
+            }
+            String path = String.valueOf(parameters.get("path"));
+            String content = String.valueOf(parameters.get("content"));
+            ScriptSafetyValidator.ValidationResult res = validator.validate(path, content);
+            return res.isValid() ? null : res.getViolationMessage();
+        }
+    }
+
+    @Component
+    public static class DeleteScript implements Tool {
+        private static final ScriptSafetyValidator validator = new ScriptSafetyValidator();
+
+        @Override public String name() { return "delete_script"; }
+        @Override public String description() {
+            return "Delete a C# script inside Assets/. Inspects active scene for attached components before deletion.";
+        }
+        @Override public ToolPermission permission() { return ToolPermission.DESTRUCTIVE; }
+        @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override public Map<String, Object> inputSchema() {
+            return Map.of("type", "object", "properties", Map.of("path", Map.of("type", "string", "description", "Script path in Assets/")), "required", List.of("path"));
+        }
+
+        @Override public String validate(Map<String, Object> parameters) {
+            if (parameters == null || !parameters.containsKey("path")) return "Parameter 'path' is required";
+            ScriptSafetyValidator.ValidationResult res = validator.validatePath(String.valueOf(parameters.get("path")));
+            return res.isValid() ? null : res.getViolationMessage();
+        }
+    }
+
+    @Component
+    public static class ListScripts implements Tool {
+        @Override public String name() { return "list_scripts"; }
+        @Override public String description() {
+            return "List all C# scripts in Assets/ or a subfolder with their paths, hashes, and sizes.";
+        }
+        @Override public ToolPermission permission() { return ToolPermission.SAFE; }
+        @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+
+        @Override public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("path", Map.of("type", "string", "description", "Folder path (default 'Assets')"));
+            props.put("recursive", Map.of("type", "boolean", "description", "Whether to search subdirectories (default true)"));
+            return Map.of("type", "object", "properties", props);
+        }
+
+        @Override public String validate(Map<String, Object> parameters) { return null; }
+    }
+
+    // ==========================================
+    // Phase 6 Tools: Compilation & Runtime
+    // ==========================================
+
+    @Component
+    public static class GetProjectInfo implements Tool {
+        @Override public String name() { return "get_project_info"; }
+        @Override public String description() {
+            return "Retrieve Unity version, project path, active scene, compilation status, and Play Mode state.";
+        }
+        @Override public ToolPermission permission() { return ToolPermission.SAFE; }
+        @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+
+        @Override public Map<String, Object> inputSchema() {
+            return Map.of("type", "object", "properties", Map.of());
+        }
+
+        @Override public String validate(Map<String, Object> parameters) { return null; }
+    }
+
+    @Component
+    public static class CompileProject implements Tool {
+        @Override public String name() { return "compile_project"; }
+        @Override public String description() {
+            return "Trigger synchronous Unity asset refresh and script compilation. Waits for completion and returns structured diagnostics (CS error codes, file, line, message).";
+        }
+        @Override public ToolPermission permission() { return ToolPermission.SAFE; }
+        @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override public Map<String, Object> inputSchema() {
+            return Map.of("type", "object", "properties", Map.of());
+        }
+
+        @Override public String validate(Map<String, Object> parameters) { return null; }
+    }
+
+    @Component
+    public static class EnterPlayMode implements Tool {
+        @Override public String name() { return "enter_play_mode"; }
+        @Override public String description() {
+            return "Enter Unity Play Mode. Verifies compilation is successful first and records baseline console errors.";
+        }
+        @Override public ToolPermission permission() { return ToolPermission.SAFE; }
+        @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR, ToolMode.BOTH); }
+
+        @Override public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("runtimeTestId", Map.of("type", "string", "description", "Optional unique test identifier"));
+            return Map.of("type", "object", "properties", props);
+        }
+
+        @Override public String validate(Map<String, Object> parameters) { return null; }
+    }
+
+    @Component
+    public static class ExitPlayMode implements Tool {
+        @Override public String name() { return "exit_play_mode"; }
+        @Override public String description() {
+            return "Exit Unity Play Mode and collect errors and exceptions generated during the test session.";
+        }
+        @Override public ToolPermission permission() { return ToolPermission.SAFE; }
+        @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.PLAY_MODE, ToolMode.BOTH); }
+
+        @Override public Map<String, Object> inputSchema() {
+            return Map.of("type", "object", "properties", Map.of());
+        }
+
+        @Override public String validate(Map<String, Object> parameters) { return null; }
+    }
+
+    @Component
+    public static class RunGameTest implements Tool {
+        @Override public String name() { return "run_game_test"; }
+        @Override public String description() {
+            return "Run behavioral runtime test on a GameObject in Play Mode (e.g. testing player movement response to simulated input).";
+        }
+        @Override public ToolPermission permission() { return ToolPermission.SAFE; }
+        @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.PLAY_MODE, ToolMode.BOTH); }
+
+        @Override public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("target", Map.of("type", "string", "description", "Target GameObject to test (e.g. 'Player')"));
+            return Map.of("type", "object", "properties", props, "required", List.of("target"));
+        }
+
+        @Override public String validate(Map<String, Object> parameters) {
+            if (parameters == null || !parameters.containsKey("target")) return "Parameter 'target' is required";
+            return null;
+        }
+    }
+
+    @Component
+    public static class ValidateGameState implements Tool {
+        @Override public String name() { return "validate_game_state"; }
+        @Override public String description() {
+            return "Objectively validate scene state, GameObjects, components, scripts, compilation, and runtime errors against goal requirements.";
+        }
+        @Override public ToolPermission permission() { return ToolPermission.SAFE; }
+        @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+
+        @Override public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("requirements", Map.of("type", "string", "description", "Optional JSON array of requirement specifications to evaluate"));
+            return Map.of("type", "object", "properties", props);
+        }
+
+        @Override public String validate(Map<String, Object> parameters) { return null; }
+    }
 }
+

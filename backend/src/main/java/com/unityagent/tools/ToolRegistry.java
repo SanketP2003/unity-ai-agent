@@ -4,14 +4,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Registry of all available Unity tools.
- * Tools self-register at startup via Spring dependency injection.
+ * Dynamic registry of all available Unity tools.
+ * Supports tool registration, unregistration, lookup, mode/permission filtering,
+ * parameter validation, and OpenAI function calling schema generation.
  */
 @Component
 public class ToolRegistry {
@@ -25,18 +24,19 @@ public class ToolRegistry {
      * Spring injects all beans implementing the Tool interface.
      */
     public ToolRegistry(List<Tool> toolBeans) {
-        for (Tool tool : toolBeans) {
-            register(tool);
+        if (toolBeans != null) {
+            for (Tool tool : toolBeans) {
+                register(tool);
+            }
         }
         log.info("ToolRegistry initialized with {} tool(s): {}", tools.size(), tools.keySet());
     }
 
     /**
      * Register a tool. Rejects duplicates.
-     *
-     * @throws IllegalArgumentException if a tool with the same name is already registered
      */
     public void register(Tool tool) {
+        Objects.requireNonNull(tool, "Tool cannot be null");
         Tool existing = tools.putIfAbsent(tool.name(), tool);
         if (existing != null) {
             throw new IllegalArgumentException(
@@ -46,10 +46,24 @@ public class ToolRegistry {
     }
 
     /**
+     * Unregister a tool by name.
+     *
+     * @return true if the tool was found and removed
+     */
+    public boolean unregister(String name) {
+        if (name == null) return false;
+        boolean removed = tools.remove(name) != null;
+        if (removed) {
+            log.info("Unregistered tool: {}", name);
+        }
+        return removed;
+    }
+
+    /**
      * Check if a tool is registered.
      */
     public boolean hasTool(String name) {
-        return tools.containsKey(name);
+        return name != null && tools.containsKey(name);
     }
 
     /**
@@ -66,10 +80,81 @@ public class ToolRegistry {
     }
 
     /**
+     * Find a tool by name wrapped in an Optional.
+     */
+    public Optional<Tool> find(String name) {
+        if (name == null) return Optional.empty();
+        return Optional.ofNullable(tools.get(name));
+    }
+
+    /**
      * @return unmodifiable view of all registered tools
      */
     public Collection<Tool> getAllTools() {
         return Collections.unmodifiableCollection(tools.values());
+    }
+
+    /**
+     * Alias for getAllTools() per architecture specification.
+     */
+    public Collection<Tool> list() {
+        return getAllTools();
+    }
+
+    /**
+     * @return all tool definitions
+     */
+    public List<ToolDefinition> listDefinitions() {
+        return tools.values().stream()
+                .map(Tool::definition)
+                .toList();
+    }
+
+    /**
+     * Validate a tool by name and its parameters.
+     *
+     * @return null if valid, or a descriptive error message
+     */
+    public String validate(String toolName, Map<String, Object> parameters) {
+        if (toolName == null || toolName.isBlank()) {
+            return "Tool name is required";
+        }
+        Tool tool = tools.get(toolName);
+        if (tool == null) {
+            return "Unknown tool: " + toolName;
+        }
+        if (tool.permission() == ToolPermission.BLOCKED) {
+            return "Tool '" + toolName + "' is BLOCKED from execution";
+        }
+        return tool.validate(parameters);
+    }
+
+    /**
+     * Generate OpenAI-compatible tool specifications for all active tools.
+     */
+    public List<Map<String, Object>> getOpenAIToolDefinitions() {
+        return getOpenAIToolDefinitions(ToolMode.BOTH, EnumSet.complementOf(EnumSet.of(ToolPermission.BLOCKED)));
+    }
+
+    /**
+     * Generate OpenAI-compatible tool specifications filtered by mode and allowed permissions.
+     */
+    public List<Map<String, Object>> getOpenAIToolDefinitions(ToolMode mode, Set<ToolPermission> allowedPermissions) {
+        List<Map<String, Object>> openAiTools = new ArrayList<>();
+        for (Tool tool : tools.values()) {
+            ToolDefinition def = tool.definition();
+            if (def.getPermission() == ToolPermission.BLOCKED) {
+                continue;
+            }
+            if (allowedPermissions != null && !allowedPermissions.contains(def.getPermission())) {
+                continue;
+            }
+            if (mode != null && !def.isAllowedInMode(mode)) {
+                continue;
+            }
+            openAiTools.add(def.toOpenAITool());
+        }
+        return openAiTools;
     }
 
     /**

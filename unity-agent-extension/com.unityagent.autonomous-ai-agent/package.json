@@ -1,0 +1,26 @@
+{
+  "name": "com.unityagent.autonomous-ai-agent",
+  "version": "1.0.0",
+  "displayName": "Autonomous Unity AI Agent",
+  "description": "Project-independent, model-agnostic autonomous AI game developer extension for Unity.",
+  "unity": "6000.0",
+  "unityRelease": "0f1",
+  "documentationUrl": "https://github.com/unityagent/autonomous-unity-agent",
+  "changelogUrl": "https://github.com/unityagent/autonomous-unity-agent/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/unityagent/autonomous-unity-agent/blob/main/LICENSE.md",
+  "dependencies": {},
+  "keywords": [
+    "ai",
+    "agent",
+    "autonomous",
+    "tools",
+    "copilot",
+    "llm",
+    "developer"
+  ],
+  "author": {
+    "name": "Autonomous Unity Agent Team",
+    "email": "support@unityagent.com",
+    "url": "https://unityagent.com"
+  }
+}

@@ -77,4 +77,73 @@ class AgentControllerTest {
                                 """))
                 .andExpect(status().isServiceUnavailable());
     }
+
+    @Test
+    void runEndpointWithMissingMessageReturnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/agent/run")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("MISSING_MESSAGE"));
+    }
+
+    @Test
+    void runEndpointAsyncReturnsRunningStatusAndRunId() throws Exception {
+        mockMvc.perform(post("/api/agent/run")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "sessionId": "test_sess_ctrl",
+                                  "agentRunId": "test_run_ctrl",
+                                  "message": "Create a cube",
+                                  "async": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionId").value("test_sess_ctrl"))
+                .andExpect(jsonPath("$.agentRunId").value("test_run_ctrl"))
+                .andExpect(jsonPath("$.status").value("RUNNING"));
+    }
+
+    @Test
+    void getRunStatusEndpointReturnsState() throws Exception {
+        mockMvc.perform(get("/api/agent/run/test_run_ctrl"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.agentRunId").value("test_run_ctrl"))
+                .andExpect(jsonPath("$.sessionId").value("test_sess_ctrl"));
+    }
+
+    @Test
+    void getRunStatusNonexistentReturnsNotFound() throws Exception {
+        mockMvc.perform(get("/api/agent/run/nonexistent_run_id"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+    }
+
+    @Test
+    void cancelRunEndpointReturnsCancelledStatus() throws Exception {
+        mockMvc.perform(post("/api/agent/run/test_run_ctrl/cancel"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.agentRunId").value("test_run_ctrl"))
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void getSessionEndpointReturnsMessages() throws Exception {
+        mockMvc.perform(get("/api/agent/session/test_sess_ctrl"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionId").value("test_sess_ctrl"))
+                .andExpect(jsonPath("$.messages").isArray());
+    }
+
+    @Test
+    void statusEndpointIncludesBackendUnityAndLlmInfo() throws Exception {
+        mockMvc.perform(get("/api/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.backend.available").value(true))
+                .andExpect(jsonPath("$.unity.connected").value(false))
+                .andExpect(jsonPath("$.llm.provider").isString())
+                .andExpect(jsonPath("$.llm.configured").isBoolean())
+                .andExpect(jsonPath("$.llm.available").isBoolean());
+    }
 }

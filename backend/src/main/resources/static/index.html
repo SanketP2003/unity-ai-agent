@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autonomous Unity AI Agent — Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-section">
+        <div class="brand-logo">⚡</div>
+        <div class="brand-info">
+          <h1>Autonomous Unity AI Agent</h1>
+          <span class="brand-subtitle">Project-Independent & Model-Agnostic Engine</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="status-indicators">
+          <div id="badge-backend" class="status-pill status-checking" title="Backend API Health">
+            <span class="status-dot"></span>
+            <span class="status-label">Backend</span>
+          </div>
+          <div id="badge-unity" class="status-pill status-checking" title="Unity WebSocket Bridge">
+            <span class="status-dot"></span>
+            <span class="status-label">Unity</span>
+          </div>
+          <div id="badge-provider" class="status-pill status-checking" title="AI Provider & Model">
+            <span class="status-dot"></span>
+            <span id="badge-provider-text" class="status-label">AI Provider</span>
+          </div>
+        </div>
+
+        <button id="btn-open-settings" class="btn btn-secondary" title="Configure AI Provider and Credentials">
+          ⚙️ Settings
+        </button>
+
+        <div class="session-controls">
+          <label for="session-input">Session:</label>
+          <input type="text" id="session-input" value="session_001" spellcheck="false" />
+          <button id="btn-new-session" class="btn btn-secondary" title="Create a new isolated session">+ New</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Goal & Agent State Banner -->
+    <div id="goal-banner" class="goal-banner hidden">
+      <div class="goal-info">
+        <span class="goal-label">GOAL</span>
+        <span id="goal-description" class="goal-text">Constructing game scene...</span>
+      </div>
+      <div class="agent-state-badge" id="agent-state-badge">IDLE</div>
+      <div class="plan-step-info" id="plan-step-info">
+        <span class="plan-step-label">PLAN STEP:</span>
+        <span id="current-plan-step" class="plan-step-text">None</span>
+      </div>
+    </div>
+
+    <!-- Autonomous Pipeline Stage Banner (7 Stages) -->
+    <div id="pipeline-banner" class="pipeline-banner hidden">
+      <div class="pipeline-step" data-step="PLANNING">
+        <span class="step-dot"></span>
+        <span class="step-name">Planning</span>
+      </div>
+      <div class="pipeline-connector"></div>
+      <div class="pipeline-step" data-step="BUILDING">
+        <span class="step-dot"></span>
+        <span class="step-name">Building</span>
+      </div>
+      <div class="pipeline-connector"></div>
+      <div class="pipeline-step" data-step="COMPILING">
+        <span class="step-dot"></span>
+        <span class="step-name">Compiling</span>
+      </div>
+      <div class="pipeline-connector"></div>
+      <div class="pipeline-step" data-step="DIAGNOSING">
+        <span class="step-dot"></span>
+        <span class="step-name">Diagnosing</span>
+      </div>
+      <div class="pipeline-connector"></div>
+      <div class="pipeline-step" data-step="REPAIRING">
+        <span class="step-dot"></span>
+        <span class="step-name">Repairing</span>
+      </div>
+      <div class="pipeline-connector"></div>
+      <div class="pipeline-step" data-step="TESTING">
+        <span class="step-dot"></span>
+        <span class="step-name">Testing</span>
+      </div>
+      <div class="pipeline-connector"></div>
+      <div class="pipeline-step" data-step="VALIDATING">
+        <span class="step-dot"></span>
+        <span class="step-name">Validating</span>
+      </div>
+    </div>
+
+    <!-- Diagnostic Results Bar -->
+    <div id="results-bar" class="results-bar hidden">
+      <div class="result-card" id="res-compilation">
+        <span class="result-title">Compilation:</span>
+        <span class="result-value" id="val-compilation">CLEAN</span>
+      </div>
+      <div class="result-card" id="res-runtime">
+        <span class="result-title">Runtime Test:</span>
+        <span class="result-value" id="val-runtime">CLEAN</span>
+      </div>
+      <div class="result-card" id="res-validation">
+        <span class="result-title">Objective Validation:</span>
+        <span class="result-value" id="val-validation">PENDING</span>
+      </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="chat-container">
+      <div id="chat-messages" class="chat-stream">
+        <!-- Messages & Tool Execution Cards -->
+        <div class="welcome-card" id="welcome-card">
+          <div class="welcome-icon">🎮</div>
+          <h2>Autonomous Unity Development Agent</h2>
+          <p>Model-agnostic AI agent operating via WebSocket Protocol v1.0. Executes autonomous planning, scene construction, script generation, compile error repair, and runtime validation.</p>
+          <div class="quick-prompts">
+            <button class="prompt-chip" data-prompt="Create a small Unity scene with a blue ground plane and a red sphere above it.">
+              🟦 Blue ground & red sphere
+            </button>
+            <button class="prompt-chip" data-prompt="Inspect the current Unity project info and summarize active scene, components, and compiler state.">
+              🔍 Get project info & inspect
+            </button>
+            <button class="prompt-chip" data-prompt="Build me a small playable 3D platform game with a player, ground, platforms, enemies, goal, camera, lighting, and movement.">
+              🚀 Build complete 3D platformer game
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Agent Activity Banner -->
+      <div id="agent-activity-banner" class="agent-activity-banner hidden">
+        <div class="spinner"></div>
+        <span id="agent-activity-text" class="activity-text">Thinking...</span>
+        <span id="agent-run-badge" class="activity-run-id"></span>
+      </div>
+    </main>
+
+    <!-- Footer / Input Bar -->
+    <footer class="input-container">
+      <div class="input-wrapper">
+        <textarea
+          id="user-prompt"
+          rows="1"
+          placeholder="Describe what you want to build or test in Unity... (Shift+Enter for new line)"
+          autofocus
+        ></textarea>
+        <div class="input-actions">
+          <button id="btn-cancel" class="btn btn-danger hidden" title="Cancel the currently active agent run">
+            Cancel Run
+          </button>
+          <button id="btn-send" class="btn btn-primary">
+            <span>Send</span>
+            <svg class="send-icon" viewBox="0 0 24 24" width="16" height="16">
+              <path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="input-footer-note">
+        Agent executes live actions on Unity 6 via Protocol v1.0. Dynamic planning & compile recovery enabled.
+      </div>
+    </footer>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>AI Provider Settings</h2>
+        <button id="btn-close-settings" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-note">
+          Configure model provider credentials. Keys are held in the Agent Runtime memory and are <strong>never stored in Unity project files or Git</strong>.
+        </p>
+
+        <div class="form-group">
+          <label for="cfg-provider">Provider Type:</label>
+          <select id="cfg-provider">
+            <option value="openai-compatible">OpenAI-compatible (NVIDIA NIM, Groq, Together, Ollama, vLLM)</option>
+            <option value="openai">OpenAI (Official)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="cfg-base-url">Base URL:</label>
+          <input type="text" id="cfg-base-url" placeholder="https://api.example.com/v1" />
+        </div>
+
+        <div class="form-group">
+          <label for="cfg-model">Model Name:</label>
+          <input type="text" id="cfg-model" placeholder="e.g. gpt-4o or meta/llama-3.1-70b-instruct" />
+        </div>
+
+        <div class="form-group">
+          <label for="cfg-api-key">API Key (Masked):</label>
+          <input type="password" id="cfg-api-key" placeholder="Enter new API key or leave blank to keep current" />
+          <span id="cfg-key-status" class="field-hint">Key configured: checking...</span>
+        </div>
+
+        <div id="cfg-feedback" class="settings-feedback hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-save-settings" class="btn btn-primary">Save & Apply</button>
+        <button id="btn-cancel-settings" class="btn btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

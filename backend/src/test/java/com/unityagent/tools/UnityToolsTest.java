@@ -147,4 +147,82 @@ class UnityToolsTest {
         assertNull(getConsoleLogs.validate(Map.of("count", 10, "logType", "Error")));
         assertNotNull(getConsoleLogs.validate(Map.of("logType", "Notice")));
     }
+
+    @Test
+    void testGetActiveScene() {
+        var tool = new UnityTools.GetActiveScene();
+        assertEquals("get_active_scene", tool.name());
+        assertEquals(ToolPermission.SAFE, tool.permission());
+        assertTrue(tool.allowedModes().contains(ToolMode.BOTH));
+        assertNull(tool.validate(Map.of()));
+    }
+
+    @Test
+    void testGetSelectedObject() {
+        var tool = new UnityTools.GetSelectedObject();
+        assertEquals("get_selected_object", tool.name());
+        assertEquals(ToolPermission.SAFE, tool.permission());
+        assertTrue(tool.allowedModes().contains(ToolMode.EDITOR));
+        assertNull(tool.validate(Map.of()));
+    }
+
+    @Test
+    void testGetObjectComponentsValidation() {
+        var tool = new UnityTools.GetObjectComponents();
+        assertEquals("get_object_components", tool.name());
+        assertEquals(ToolPermission.SAFE, tool.permission());
+
+        // Missing target and objectId
+        assertNotNull(tool.validate(Map.of()));
+        assertNotNull(tool.validate(Map.of("target", "")));
+
+        // Valid with target
+        assertNull(tool.validate(Map.of("target", "Player")));
+
+        // Valid with objectId
+        assertNull(tool.validate(Map.of("objectId", "obj_12345")));
+
+        // Valid with both
+        assertNull(tool.validate(Map.of("target", "Player", "objectId", "obj_12345")));
+    }
+
+    @Test
+    void testGetObjectTransformValidation() {
+        var tool = new UnityTools.GetObjectTransform();
+        assertEquals("get_object_transform", tool.name());
+        assertEquals(ToolPermission.SAFE, tool.permission());
+
+        // Missing target and objectId
+        assertNotNull(tool.validate(Map.of()));
+
+        // Valid with target
+        assertNull(tool.validate(Map.of("target", "Main Camera")));
+
+        // Valid with objectId
+        assertNull(tool.validate(Map.of("objectId", "obj_999")));
+    }
+
+    @Test
+    void testGetPlayModeState() {
+        var tool = new UnityTools.GetPlayModeState();
+        assertEquals("get_play_mode_state", tool.name());
+        assertEquals(ToolPermission.SAFE, tool.permission());
+        assertTrue(tool.allowedModes().contains(ToolMode.BOTH));
+        assertNull(tool.validate(Map.of()));
+    }
+
+    @Test
+    void testGetConsoleErrorsValidation() {
+        var tool = new UnityTools.GetConsoleErrors();
+        assertEquals("get_console_errors", tool.name());
+        assertEquals(ToolPermission.SAFE, tool.permission());
+
+        // Valid default
+        assertNull(tool.validate(Map.of()));
+        assertNull(tool.validate(Map.of("count", 25)));
+
+        // Invalid count
+        assertNotNull(tool.validate(Map.of("count", "invalid")));
+        assertNotNull(tool.validate(Map.of("count", -5)));
+    }
 }

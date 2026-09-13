@@ -38,6 +38,33 @@ public class UnityCommandExecutor {
      */
     public UnityMessage execute(String toolName, Map<String, Object> parameters)
             throws TimeoutException, ExecutionException, InterruptedException {
+        return execute(null, toolName, parameters);
+    }
+
+    /**
+     * Execute a tool command on Unity with an explicit correlated operationId.
+     *
+     * @param operationId explicit operation ID (or null to generate a new one)
+     * @param toolName    the registered tool name
+     * @param parameters  the tool parameters
+     * @return the structured response from Unity
+     */
+    public UnityMessage execute(String operationId, String toolName, Map<String, Object> parameters)
+            throws TimeoutException, ExecutionException, InterruptedException {
+        return execute(null, operationId, toolName, parameters);
+    }
+
+    /**
+     * Execute a tool command on a specific target Unity project with correlated operationId.
+     *
+     * @param projectId   the target project ID (or null for active project)
+     * @param operationId explicit operation ID (or null to generate a new one)
+     * @param toolName    the registered tool name
+     * @param parameters  the tool parameters
+     * @return the structured response from Unity
+     */
+    public UnityMessage execute(String projectId, String operationId, String toolName, Map<String, Object> parameters)
+            throws TimeoutException, ExecutionException, InterruptedException {
 
         // Validate tool exists
         if (!toolRegistry.hasTool(toolName)) {
@@ -51,11 +78,14 @@ public class UnityCommandExecutor {
             throw new IllegalArgumentException("Invalid parameters for tool '" + toolName + "': " + validationError);
         }
 
-        // Build and send request
-        UnityMessage request = UnityMessage.toolRequest(toolName, parameters);
-        log.info("Executing tool: {} (operationId={})", toolName, request.getOperationId());
+        // Build and send request with correlated operationId and optional projectId
+        UnityMessage request = UnityMessage.toolRequest(operationId, toolName, parameters);
+        if (projectId != null) {
+            request.setProjectId(projectId);
+        }
+        log.info("Executing tool: {} (operationId={}, projectId={})", toolName, request.getOperationId(), projectId);
 
-        UnityMessage response = connection.sendToolRequest(request);
+        UnityMessage response = connection.sendToolRequest(projectId, request);
 
         if (Boolean.TRUE.equals(response.getSuccess())) {
             log.info("Tool '{}' completed successfully (operationId={})", toolName, response.getOperationId());

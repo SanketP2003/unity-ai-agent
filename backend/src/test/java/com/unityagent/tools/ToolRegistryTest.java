@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -78,5 +79,61 @@ class ToolRegistryTest {
         ToolRegistry registry = new ToolRegistry(List.of());
         assertEquals(0, registry.size());
         assertFalse(registry.hasTool("anything"));
+    }
+
+    @Test
+    void testUnregisterAndFind() {
+        Tool tool = createTool("temp_tool");
+        ToolRegistry registry = new ToolRegistry(List.of(tool));
+        assertTrue(registry.find("temp_tool").isPresent());
+        assertEquals("temp_tool", registry.find("temp_tool").get().name());
+
+        assertTrue(registry.unregister("temp_tool"));
+        assertFalse(registry.hasTool("temp_tool"));
+        assertTrue(registry.find("temp_tool").isEmpty());
+        assertFalse(registry.unregister("temp_tool"));
+    }
+
+    @Test
+    void testListDefinitionsAndOpenAISchemas() {
+        Tool safeTool = new Tool() {
+            @Override public String name() { return "safe_tool"; }
+            @Override public String description() { return "Safe tool"; }
+            @Override public ToolPermission permission() { return ToolPermission.SAFE; }
+            @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.EDITOR); }
+            @Override public String validate(Map<String, Object> parameters) { return null; }
+            @Override public Map<String, Object> inputSchema() {
+                return Map.of("type", "object", "properties", Map.of("key", Map.of("type", "string")));
+            }
+        };
+
+        Tool blockedTool = new Tool() {
+            @Override public String name() { return "blocked_tool"; }
+            @Override public String description() { return "Blocked tool"; }
+            @Override public ToolPermission permission() { return ToolPermission.BLOCKED; }
+            @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+            @Override public String validate(Map<String, Object> parameters) { return null; }
+        };
+
+        ToolRegistry registry = new ToolRegistry(List.of(safeTool, blockedTool));
+        assertEquals(2, registry.listDefinitions().size());
+
+        // Validate blocked tool is rejected
+        String blockedVal = registry.validate("blocked_tool", Map.of());
+        assertNotNull(blockedVal);
+        assertTrue(blockedVal.contains("BLOCKED"));
+
+        // OpenAI tools generation excludes BLOCKED
+        List<Map<String, Object>> openAiTools = registry.getOpenAIToolDefinitions();
+        assertEquals(1, openAiTools.size());
+        assertEquals("function", openAiTools.get(0).get("type"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> func = (Map<String, Object>) openAiTools.get(0).get("function");
+        assertEquals("safe_tool", func.get("name"));
+        assertEquals("Safe tool", func.get("description"));
+
+        // Filter by PLAY_MODE should exclude safe_tool (which is EDITOR only)
+        List<Map<String, Object>> playTools = registry.getOpenAIToolDefinitions(ToolMode.PLAY_MODE, java.util.EnumSet.of(ToolPermission.SAFE));
+        assertEquals(0, playTools.size());
     }
 }

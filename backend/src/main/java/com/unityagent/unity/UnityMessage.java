@@ -37,6 +37,9 @@ public class UnityMessage {
     @JsonProperty("success")
     private Boolean success;
 
+    @JsonProperty("projectId")
+    private String projectId;
+
     @JsonProperty("errors")
     private List<ErrorDetail> errors;
 
@@ -48,23 +51,64 @@ public class UnityMessage {
 
     // --- Static factory methods ---
 
+    public static UnityMessage handshake(String operationId, String projectId, Map<String, ?> data) {
+        UnityMessage msg = new UnityMessage();
+        msg.type = MessageType.HANDSHAKE;
+        msg.operationId = operationId != null ? operationId : UUID.randomUUID().toString();
+        msg.projectId = projectId;
+        if (data != null) {
+            msg.data = new java.util.HashMap<>(data);
+        }
+        return msg;
+    }
+
+    public static final class Type {
+        public static final MessageType HANDSHAKE = MessageType.HANDSHAKE;
+        public static final MessageType HANDSHAKE_ACK = MessageType.HANDSHAKE_ACK;
+        public static final MessageType TOOL_REQUEST = MessageType.TOOL_REQUEST;
+        public static final MessageType TOOL_RESPONSE = MessageType.TOOL_RESPONSE;
+        public static final MessageType EVENT = MessageType.EVENT;
+        public static final MessageType ERROR = MessageType.ERROR;
+        public static final MessageType PING = MessageType.PING;
+        public static final MessageType PONG = MessageType.PONG;
+    }
+
     public static UnityMessage handshakeAck(String correlatedOperationId) {
+        return handshakeAck(correlatedOperationId, null);
+    }
+
+    public static UnityMessage handshakeAck(String correlatedOperationId, String projectId) {
         UnityMessage msg = new UnityMessage();
         msg.type = MessageType.HANDSHAKE_ACK;
         msg.operationId = correlatedOperationId;
+        msg.projectId = projectId;
         msg.success = true;
-        msg.data = Map.of(
-                "server", "autonomous-unity-agent",
-                "serverVersion", "0.1.0",
-                "protocolVersion", "1.0"
-        );
+        java.util.Map<String, Object> ackData = new java.util.HashMap<>();
+        ackData.put("server", "autonomous-unity-agent");
+        ackData.put("serverVersion", "1.0.0");
+        ackData.put("protocolVersion", "1.0");
+        if (projectId != null) {
+            ackData.put("projectId", projectId);
+        }
+        ackData.put("capabilities", java.util.Map.of(
+                "toolExecution", true,
+                "perception", true,
+                "dynamicPlanning", true,
+                "compileRecovery", true,
+                "runtimeValidation", true
+        ));
+        msg.data = ackData;
         return msg;
     }
 
     public static UnityMessage toolRequest(String tool, Map<String, Object> parameters) {
+        return toolRequest(UUID.randomUUID().toString(), tool, parameters);
+    }
+
+    public static UnityMessage toolRequest(String operationId, String tool, Map<String, Object> parameters) {
         UnityMessage msg = new UnityMessage();
         msg.type = MessageType.TOOL_REQUEST;
-        msg.operationId = UUID.randomUUID().toString();
+        msg.operationId = operationId != null ? operationId : UUID.randomUUID().toString();
         msg.tool = tool;
         msg.parameters = parameters;
         return msg;
@@ -74,6 +118,15 @@ public class UnityMessage {
         UnityMessage msg = new UnityMessage();
         msg.type = MessageType.PING;
         msg.operationId = UUID.randomUUID().toString();
+        return msg;
+    }
+
+    public static UnityMessage toolResponse(String operationId, boolean success, Map<String, Object> data) {
+        UnityMessage msg = new UnityMessage();
+        msg.type = MessageType.TOOL_RESPONSE;
+        msg.operationId = operationId;
+        msg.success = success;
+        msg.data = data;
         return msg;
     }
 
@@ -143,6 +196,14 @@ public class UnityMessage {
 
     public void setSuccess(Boolean success) {
         this.success = success;
+    }
+
+    public String getProjectId() {
+        return projectId;
+    }
+
+    public void setProjectId(String projectId) {
+        this.projectId = projectId;
     }
 
     public List<ErrorDetail> getErrors() {

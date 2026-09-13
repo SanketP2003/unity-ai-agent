@@ -30,4 +30,26 @@ public class WebSocketConfig implements WebSocketConfigurer {
         registry.addHandler(unityConnection, endpoint)
                 .setAllowedOrigins("*");
     }
+
+    @org.springframework.context.annotation.Bean
+    public org.springframework.web.socket.server.standard.ServletServerContainerFactoryBean createWebSocketContainer() {
+        org.springframework.web.socket.server.standard.ServletServerContainerFactoryBean container =
+                new org.springframework.web.socket.server.standard.ServletServerContainerFactoryBean() {
+                    @Override
+                    public void afterPropertiesSet() {
+                        try {
+                            super.afterPropertiesSet();
+                        } catch (IllegalStateException ex) {
+                            // ServerContainer attribute is absent in mock servlet contexts (e.g. MockMvc tests); ignore safely
+                            if (ex.getMessage() == null || !ex.getMessage().contains("ServerContainer")) {
+                                throw ex;
+                            }
+                        }
+                    }
+                };
+        container.setMaxTextMessageBufferSize(10 * 1024 * 1024);
+        container.setMaxBinaryMessageBufferSize(10 * 1024 * 1024);
+        return container;
+    }
 }
+

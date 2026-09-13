@@ -5,7 +5,7 @@ unity:
   websocket:
     endpoint: /unity-bridge
     ping-interval-seconds: 15
-    command-timeout-seconds: 30
+    command-timeout-seconds: 60
 
 logging:
   level:
@@ -18,7 +18,46 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
-      indent-output: true
+      indent-output: false
     deserialization:
       fail-on-unknown-properties: false
     default-property-inclusion: non_null
+
+agent:
+  ai:
+    provider: ${AI_PROVIDER:openai-compatible}
+    base-url: ${AI_BASE_URL:}
+    api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:75}
+    temperature: ${AI_TEMPERATURE:0.7}
+    max-tokens: ${AI_MAX_TOKENS:4096}
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_MODEL:gpt-4o}
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+    timeout-seconds: 75
+  limits:
+    max-iterations: 30
+    max-agent-iterations: 30
+    max-tool-failures: 6
+    max-same-tool-retries: 5
+    tool-timeout-seconds: 60
+    run-timeout-seconds: 1200
+  recovery:
+    max-compile-attempts: 10
+    max-fix-attempts-per-error: 5
+    max-runtime-validation-attempts: 5
+    max-plan-steps: 30
+    max-total-tool-calls: 100
+  compilation:
+    timeout-seconds: 120
+
+memory:
+  database-path: ${MEMORY_DB_PATH:${user.home}/.unityagent/memory.db}
+  max-history-records: 100
+  max-memory-entries: 1000
+  max-context-size: 12000
+  max-recent-conversations: 5
+  max-scripts-in-context: 20
+  stale-threshold-hours: 24
