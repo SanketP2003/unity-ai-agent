@@ -39,13 +39,14 @@ namespace AutonomousUnityAgent.Models
 
         // --- Factory Methods ---
 
-        public static BridgeMessage Handshake(string unityVersion, string projectId = null)
+        public static BridgeMessage Handshake(string unityVersion, string projectId = null, string projectName = null, string projectPath = null)
         {
             var msg = new BridgeMessage
             {
                 type = MessageType.HANDSHAKE,
                 operationId = Guid.NewGuid().ToString(),
                 protocolVersion = "1.0",
+                projectId = projectId,
                 data = JsonHelper.ToJson(new HandshakeData
                 {
                     client = "unity",
@@ -54,6 +55,8 @@ namespace AutonomousUnityAgent.Models
                     protocolVersion = "1.0",
                     unityVersion = unityVersion,
                     projectId = projectId,
+                    projectName = projectName,
+                    projectPath = projectPath,
                     capabilities = new CapabilitiesData()
                 })
             };
@@ -156,6 +159,8 @@ namespace AutonomousUnityAgent.Models
         public string protocolVersion;
         public string unityVersion;
         public string projectId;
+        public string projectName;
+        public string projectPath;
         public CapabilitiesData capabilities;
     }
 

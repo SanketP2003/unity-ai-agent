@@ -49,5 +49,18 @@ public class PlayerController : MonoBehaviour
     {
         isGrounded = false;
     }
+
+    void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag("Coin"))
+        {
+            GameManager.Instance?.AddCoin();
+            Destroy(other.gameObject);
+        }
+        else if (other.CompareTag("Finish"))
+        {
+            GameManager.Instance?.CompleteLevel();
+        }
+    }
 }
 // recompile trigger

@@ -81,7 +81,9 @@ namespace AutonomousUnityAgent.Editor
         private void OnEnable()
         {
             Application.runInBackground = true;
-            EditorPrefs.SetBool("APIUpdater.Enabled", false);
+            // Initialize persistent project identity
+            var identity = ProjectIdentity.GetOrCreateIdentity();
+            _projectId = identity.projectId;
 
             // Initialize tool dispatcher and register tools
             _toolDispatcher = new ToolDispatcher();
@@ -357,6 +359,7 @@ namespace AutonomousUnityAgent.Editor
                 if (!string.IsNullOrEmpty(msg.projectId))
                 {
                     _projectId = msg.projectId;
+                    ProjectIdentity.SetProjectId(_projectId);
                 }
                 _connectionState = ConnectionState.READY;
                 _statusMessage = string.IsNullOrEmpty(_projectId) ? "Connected and ready" : $"Connected ({_projectId})";
@@ -371,6 +374,15 @@ namespace AutonomousUnityAgent.Editor
                 Debug.LogWarning("[AgentBridge] Received TOOL_REQUEST but not READY");
                 SendMessage(BridgeMessage.Error(msg.operationId, "NOT_READY",
                     "Bridge is not ready"));
+                return;
+            }
+
+            // Phase 14: Reject misrouted requests targeted at a different project
+            if (!string.IsNullOrEmpty(msg.projectId) && !string.IsNullOrEmpty(_projectId) && msg.projectId != _projectId)
+            {
+                Debug.LogError($"[AgentBridge] Project mismatch: incoming={msg.projectId}, bridge={_projectId}");
+                SendMessage(BridgeMessage.Error(msg.operationId, "PROJECT_MISMATCH",
+                    $"Tool request targeted for project '{msg.projectId}', but bridge is connected to '{_projectId}'"));
                 return;
             }
 
@@ -418,9 +430,11 @@ namespace AutonomousUnityAgent.Editor
                 _statusMessage = "Connected, sending handshake...";
                 Repaint();
 
-                // Send HANDSHAKE
+                // Send HANDSHAKE with persistent project identity
                 _connectionState = ConnectionState.HANDSHAKING;
-                SendMessage(BridgeMessage.Handshake(Application.unityVersion));
+                var identity = ProjectIdentity.GetOrCreateIdentity();
+                _projectId = identity.projectId;
+                SendMessage(BridgeMessage.Handshake(Application.unityVersion, _projectId, identity.projectName, identity.projectPath));
 
                 _statusMessage = "Handshaking...";
                 Repaint();
@@ -529,6 +543,8 @@ namespace AutonomousUnityAgent.Editor
             EditorGUILayout.LabelField("Backend:", $"localhost:{_serverPort}");
             EditorGUILayout.LabelField("Protocol:", "1.0");
             EditorGUILayout.LabelField("Unity:", Application.unityVersion);
+            EditorGUILayout.LabelField("Project Name:", ProjectIdentity.GetProjectName());
+            EditorGUILayout.LabelField("Project ID:", string.IsNullOrEmpty(_projectId) ? ProjectIdentity.GetOrCreateProjectId() : _projectId);
             EditorGUILayout.LabelField("Bridge:", BridgeVersion);
             EditorGUILayout.LabelField("Pending Operations:", _pendingOperations.ToString());
             EditorGUILayout.LabelField("Registered Tools:", _toolDispatcher?.Count.ToString() ?? "0");

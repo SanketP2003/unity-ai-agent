@@ -93,6 +93,13 @@ public class MemoryDatabase {
                 stmt.execute(idx);
             }
 
+            // Ensure backwards compatibility with Phase 14 columns
+            try {
+                stmt.execute("ALTER TABLE projects ADD COLUMN project_path TEXT");
+            } catch (SQLException ignored) {
+                // Column already exists
+            }
+
             // Record schema version
             stmt.execute("INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES ("
                     + MemorySchema.CURRENT_VERSION + ", datetime('now'))");

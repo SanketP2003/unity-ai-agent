@@ -316,6 +316,7 @@
           <div class="view-header">
             <h2>Project Dashboard</h2>
             <div class="view-actions">
+              <button id="btn-add-project" class="btn btn-primary">➕ Add Unity Project</button>
               <button id="btn-refresh-projects" class="btn btn-secondary">🔄 Refresh</button>
             </div>
           </div>
@@ -766,6 +767,53 @@
       </div>
       <div class="modal-footer">
         <button id="btn-wiz-close" class="btn btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add / Connect Existing Unity Project -->
+  <div id="modal-add-project" class="modal-backdrop hidden">
+    <div class="modal-card" style="max-width: 600px;">
+      <div class="modal-header">
+        <h2>➕ Connect Unity Project</h2>
+        <button id="btn-close-add-project" class="btn-icon" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="field-hint">
+          Connect any supported Unity project on your filesystem. Autonomous Game Studio will detect project settings, verify compatibility, and ensure zero infrastructure pollution.
+        </p>
+
+        <div class="form-group" style="margin-top: 12px;">
+          <label for="add-proj-path">Project Directory Path on Disk:</label>
+          <input type="text" id="add-proj-path" placeholder="e.g. C:/UnityProjects/MyAwesomeGame" spellcheck="false" />
+        </div>
+
+        <div class="form-group">
+          <label for="add-proj-name">Project Display Name (Optional):</label>
+          <input type="text" id="add-proj-name" placeholder="Defaults to directory name" />
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 10px;">
+          <button id="btn-detect-project" class="btn btn-secondary">🔍 Inspect & Detect</button>
+        </div>
+
+        <div id="add-proj-feedback" class="settings-feedback hidden" style="margin-top: 12px;"></div>
+
+        <!-- Detection Summary Card -->
+        <div id="add-proj-summary" class="wizard-card hidden" style="margin-top: 12px;">
+          <h4>Inspection Results</h4>
+          <div class="wizard-check-list" style="margin-top: 8px;">
+            <div class="wizard-check-item"><span>Unity Project:</span> <strong id="detect-is-valid">-</strong></div>
+            <div class="wizard-check-item"><span>Unity Version:</span> <strong id="detect-unity-ver">-</strong></div>
+            <div class="wizard-check-item"><span>Compatible:</span> <strong id="detect-compat">-</strong></div>
+            <div class="wizard-check-item"><span>Extension Package:</span> <strong id="detect-ext-status">-</strong></div>
+            <div class="wizard-check-item"><span>Project Structure:</span> <strong id="detect-clean-status">-</strong></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-add-project" class="btn btn-secondary">Cancel</button>
+        <button id="btn-confirm-register-project" class="btn btn-primary" disabled>Register Project</button>
       </div>
     </div>
   </div>

@@ -26,6 +26,7 @@ public final class MemorySchema {
             CREATE TABLE IF NOT EXISTS projects (
                 project_id TEXT PRIMARY KEY,
                 project_name TEXT,
+                project_path TEXT,
                 unity_version TEXT,
                 platform TEXT,
                 render_pipeline TEXT,

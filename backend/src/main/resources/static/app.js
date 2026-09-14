@@ -178,8 +178,11 @@
       btnWizTestProv.addEventListener('click', handleWizardTestProvider);
     }
     if (btnWizRunAudit) {
-      btnWizRunAudit.addEventListener('click', handleWizardRunSecurityAudit);
+      btnWizRunAudit.addEventListener('click', handleWizardRunAudit);
     }
+
+    // Add Unity Project modal triggers
+    setupAddProjectModal();
   }
 
   function switchSession(sessionId) {
@@ -1449,9 +1452,15 @@
     if (!container) return;
 
     try {
-      const res = await fetch('/api/studio/projects');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const projects = await res.json();
+      // Phase 14: Fetch authoritative projects from /api/product/projects
+      let res = await fetch('/api/product/projects');
+      let projects = [];
+      if (res.ok) {
+        projects = await res.json();
+      } else {
+        res = await fetch('/api/studio/projects');
+        if (res.ok) projects = await res.json();
+      }
 
       // Update selector
       if (select) {
@@ -1459,7 +1468,8 @@
         projects.forEach(p => {
           const opt = document.createElement('option');
           opt.value = p.projectId;
-          opt.textContent = `${p.name || p.projectId} (${p.status || 'ACTIVE'})`;
+          const pName = p.projectName || p.name || p.projectId;
+          opt.textContent = `${pName} (${p.projectId})`;
           if (p.projectId === activeStudioProjectId) opt.selected = true;
           select.appendChild(opt);
         });
@@ -1472,37 +1482,51 @@
       // Render cards
       container.innerHTML = '';
       if (projects.length === 0) {
-        container.innerHTML = '<div class="empty-note">No registered projects found.</div>';
+        container.innerHTML = '<div class="empty-note">No registered projects found. Click "➕ Add Unity Project" to connect any Unity project.</div>';
         return;
       }
 
-      projects.forEach(p => {
+      for (const p of projects) {
         const card = document.createElement('div');
         const isActive = p.projectId === activeStudioProjectId;
         card.className = `project-card ${isActive ? 'active-project' : ''}`;
-        const lastActive = p.lastActiveAt ? new Date(p.lastActiveAt).toLocaleString() : 'Never';
+        const lastActive = p.lastConnectedAt ? new Date(p.lastConnectedAt).toLocaleString() :
+                          (p.lastActiveAt ? new Date(p.lastActiveAt).toLocaleString() : 'Never');
+        const pName = p.projectName || p.name || p.projectId;
+
         card.innerHTML = `
           <div class="project-card-header">
-            <h4 class="project-title">${escapeHtml(p.name || p.projectId)}</h4>
-            <span class="status-pill status-${(p.status || 'ACTIVE').toLowerCase() === 'active' ? 'online' : 'checking'}">
-              ${escapeHtml(p.status || 'ACTIVE')}
-            </span>
+            <h4 class="project-title">${escapeHtml(pName)}</h4>
+            <span class="status-pill status-checking" id="conn-pill-${escapeHtml(p.projectId)}">Checking...</span>
           </div>
           <div class="project-card-body">
-            <p class="project-path" title="${escapeHtml(p.projectPath || '')}">${escapeHtml(p.projectPath || 'No local path configured')}</p>
+            <p class="project-path" title="${escapeHtml(p.projectPath || '')}"><strong>Path:</strong> ${escapeHtml(p.projectPath || 'No local path')}</p>
             <div class="project-meta-row">
+              <span><strong>ID:</strong> ${escapeHtml(p.projectId)}</span>
               <span><strong>Unity:</strong> ${escapeHtml(p.unityVersion || '2022.3 LTS')}</span>
-              <span><strong>Last Active:</strong> ${escapeHtml(lastActive)}</span>
+            </div>
+            <div class="project-meta-row" style="margin-top: 4px;">
+              <span><strong>Last Connected:</strong> ${escapeHtml(lastActive)}</span>
+              <span id="hygiene-status-${escapeHtml(p.projectId)}"><strong>Hygiene:</strong> <span class="status-pill status-checking">Pending</span></span>
             </div>
           </div>
-          <div class="project-card-actions">
+          <div class="project-card-actions" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;">
             <button class="btn btn-small btn-primary btn-select-proj" data-proj="${escapeHtml(p.projectId)}">
               ${isActive ? 'Active Project' : 'Select Project'}
+            </button>
+            <button class="btn btn-small btn-secondary btn-check-hygiene" data-proj="${escapeHtml(p.projectId)}">
+              🛡️ Hygiene Scan
+            </button>
+            <button class="btn btn-small btn-secondary btn-install-ext" data-proj="${escapeHtml(p.projectId)}">
+              📦 Install Extension
             </button>
           </div>
         `;
         container.appendChild(card);
-      });
+
+        // Async check connection
+        checkProjectConnection(p.projectId);
+      }
 
       container.querySelectorAll('.btn-select-proj').forEach(b => {
         b.addEventListener('click', (e) => {
@@ -1517,9 +1541,194 @@
           }
         });
       });
+
+      container.querySelectorAll('.btn-check-hygiene').forEach(b => {
+        b.addEventListener('click', async (e) => {
+          const pid = e.currentTarget.getAttribute('data-proj');
+          const span = document.getElementById(`hygiene-status-${pid}`);
+          if (span) span.innerHTML = '<strong>Hygiene:</strong> Scanning...';
+          try {
+            const hRes = await fetch(`/api/product/projects/${encodeURIComponent(pid)}/hygiene`);
+            if (hRes.ok) {
+              const report = await hRes.json();
+              if (report.clean) {
+                if (span) span.innerHTML = '<strong>Hygiene:</strong> <span class="status-pill status-online">CLEAN</span>';
+              } else {
+                if (span) span.innerHTML = `<strong>Hygiene:</strong> <span class="status-pill status-error" title="${escapeHtml(report.violations.join('; '))}">VIOLATIONS (${report.violations.length})</span>`;
+              }
+            }
+          } catch (err) {
+            if (span) span.innerHTML = '<strong>Hygiene:</strong> <span class="status-pill status-error">Scan failed</span>';
+          }
+        });
+      });
+
+      container.querySelectorAll('.btn-install-ext').forEach(b => {
+        b.addEventListener('click', async (e) => {
+          const pid = e.currentTarget.getAttribute('data-proj');
+          const btn = e.currentTarget;
+          btn.disabled = true;
+          btn.textContent = 'Installing...';
+          try {
+            const iRes = await fetch(`/api/product/projects/${encodeURIComponent(pid)}/install-extension`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({})
+            });
+            const data = await iRes.json();
+            if (data.success) {
+              btn.textContent = '✅ Installed';
+            } else {
+              btn.textContent = '❌ Failed';
+              alert(data.message || 'Installation failed');
+            }
+          } catch (err) {
+            btn.textContent = '❌ Error';
+          } finally {
+            setTimeout(() => { btn.disabled = false; btn.textContent = '📦 Install Extension'; }, 3000);
+          }
+        });
+      });
+
     } catch (err) {
       console.warn('Failed to load projects:', err);
       container.innerHTML = `<div class="error-note">Failed to load projects: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function checkProjectConnection(projectId) {
+    const pill = document.getElementById(`conn-pill-${projectId}`);
+    if (!pill) return;
+    try {
+      const res = await fetch(`/api/product/projects/${encodeURIComponent(projectId)}/connect`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.connected) {
+          pill.className = 'status-pill status-online';
+          pill.textContent = 'ONLINE';
+        } else {
+          pill.className = 'status-pill status-offline';
+          pill.textContent = 'DISCONNECTED';
+        }
+      }
+    } catch {
+      pill.className = 'status-pill status-offline';
+      pill.textContent = 'UNKNOWN';
+    }
+  }
+
+  // ── Phase 14: Add Unity Project Modal Setup ─────────────────────────────
+  function setupAddProjectModal() {
+    const btnAddProj = document.getElementById('btn-add-project');
+    const modal = document.getElementById('modal-add-project');
+    const btnClose = document.getElementById('btn-close-add-project');
+    const btnCancel = document.getElementById('btn-cancel-add-project');
+    const btnDetect = document.getElementById('btn-detect-project');
+    const btnConfirm = document.getElementById('btn-confirm-register-project');
+    const inputPath = document.getElementById('add-proj-path');
+    const inputName = document.getElementById('add-proj-name');
+    const feedback = document.getElementById('add-proj-feedback');
+    const summaryCard = document.getElementById('add-proj-summary');
+
+    if (!btnAddProj || !modal) return;
+
+    btnAddProj.addEventListener('click', () => {
+      modal.classList.remove('hidden');
+      if (feedback) feedback.classList.add('hidden');
+      if (summaryCard) summaryCard.classList.add('hidden');
+      if (btnConfirm) btnConfirm.disabled = true;
+    });
+
+    const closeModal = () => modal.classList.add('hidden');
+    if (btnClose) btnClose.addEventListener('click', closeModal);
+    if (btnCancel) btnCancel.addEventListener('click', closeModal);
+
+    if (btnDetect) {
+      btnDetect.addEventListener('click', async () => {
+        const path = inputPath.value.trim();
+        if (!path) {
+          showAddProjFeedback('Please enter a project directory path.', false);
+          return;
+        }
+
+        btnDetect.disabled = true;
+        btnDetect.textContent = 'Inspecting...';
+
+        try {
+          const res = await fetch('/api/product/projects/detect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path })
+          });
+
+          const data = await res.json();
+          if (data.valid) {
+            showAddProjFeedback(`Valid Unity project detected: ${data.projectName || 'Project'}`, true);
+            if (summaryCard) {
+              summaryCard.classList.remove('hidden');
+              document.getElementById('detect-is-valid').textContent = '✅ Valid (Assets found)';
+              document.getElementById('detect-unity-ver').textContent = data.unityVersion || 'Unknown';
+              document.getElementById('detect-compat').textContent = data.compatible ? '✅ Supported' : '⚠️ Warning';
+              document.getElementById('detect-ext-status').textContent = data.extensionInstalled ? '✅ Installed' : 'Not installed';
+              document.getElementById('detect-clean-status').textContent = data.emptyProject ? 'Fresh / Clean Project' : 'Existing Game Project';
+            }
+            if (btnConfirm) btnConfirm.disabled = false;
+            if (inputName && !inputName.value && data.projectName) {
+              inputName.value = data.projectName;
+            }
+          } else {
+            showAddProjFeedback(data.errors ? data.errors.join('; ') : 'Directory is not a valid Unity project.', false);
+            if (summaryCard) summaryCard.classList.add('hidden');
+            if (btnConfirm) btnConfirm.disabled = true;
+          }
+        } catch (err) {
+          showAddProjFeedback('Error inspecting directory: ' + err.message, false);
+        } finally {
+          btnDetect.disabled = false;
+          btnDetect.textContent = '🔍 Inspect & Detect';
+        }
+      });
+    }
+
+    if (btnConfirm) {
+      btnConfirm.addEventListener('click', async () => {
+        const path = inputPath.value.trim();
+        const name = inputName.value.trim();
+
+        btnConfirm.disabled = true;
+        btnConfirm.textContent = 'Registering...';
+
+        try {
+          const res = await fetch('/api/product/projects/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path, name })
+          });
+
+          if (res.ok) {
+            const project = await res.json();
+            activeStudioProjectId = project.projectId;
+            localStorage.setItem('studio_active_project', project.projectId);
+            closeModal();
+            loadStudioProjects();
+          } else {
+            const err = await res.json();
+            showAddProjFeedback('Registration failed: ' + (err.error || 'Server error'), false);
+          }
+        } catch (err) {
+          showAddProjFeedback('Registration error: ' + err.message, false);
+        } finally {
+          btnConfirm.disabled = false;
+          btnConfirm.textContent = 'Register Project';
+        }
+      });
+    }
+
+    function showAddProjFeedback(msg, isSuccess) {
+      if (!feedback) return;
+      feedback.textContent = msg;
+      feedback.className = `settings-feedback ${isSuccess ? 'success' : 'error'}`;
+      feedback.classList.remove('hidden');
     }
   }
 

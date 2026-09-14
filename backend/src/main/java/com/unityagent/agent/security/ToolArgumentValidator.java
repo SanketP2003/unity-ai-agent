@@ -77,7 +77,7 @@ public class ToolArgumentValidator {
                 }
 
                 // Check for shell command injection in non-script text fields
-                if (!key.equalsIgnoreCase("scriptContent") && !key.equalsIgnoreCase("code")) {
+                if (!isScriptOrCodeField(toolName, key)) {
                     if (SUSPICIOUS_SHELL.matcher(s).find()) {
                         return ValidationResult.reject(String.format("Argument '%s' contains prohibited command chaining characters", key));
                     }
@@ -86,6 +86,19 @@ public class ToolArgumentValidator {
         }
 
         return ValidationResult.ok();
+    }
+
+    private boolean isScriptOrCodeField(String toolName, String key) {
+        String lowerKey = key.toLowerCase();
+        if (lowerKey.equals("scriptcontent") || lowerKey.equals("code") || lowerKey.equals("content")
+                || lowerKey.equals("source") || lowerKey.equals("body") || lowerKey.equals("script")
+                || lowerKey.equals("replacement") || lowerKey.equals("replacementcontent")
+                || lowerKey.equals("targetcontent") || lowerKey.equals("prompt") || lowerKey.equals("description")
+                || lowerKey.equals("csharpcode") || lowerKey.equals("text")) {
+            return true;
+        }
+        String lowerTool = toolName != null ? toolName.toLowerCase() : "";
+        return lowerTool.contains("script") || lowerTool.contains("shader") || lowerTool.contains("compile");
     }
 
     private boolean isPathKey(String key) {

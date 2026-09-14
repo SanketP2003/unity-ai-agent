@@ -1,0 +1,21 @@
+{
+    "name": "com.unityagent.tests.runtime",
+    "rootNamespace": "AutonomousUnityAgent.Tests.Runtime",
+    "references": [
+        "com.unityagent.runtime",
+        "UnityEngine.TestRunner"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -62,6 +62,13 @@ public class UnityMessage {
         return msg;
     }
 
+    public static UnityMessage handshake(String unityVersion) {
+        return handshake(UUID.randomUUID().toString(), null, Map.of(
+                "unityVersion", unityVersion != null ? unityVersion : "6000.0.0f1",
+                "protocolVersion", "1.0"
+        ));
+    }
+
     public static final class Type {
         public static final MessageType HANDSHAKE = MessageType.HANDSHAKE;
         public static final MessageType HANDSHAKE_ACK = MessageType.HANDSHAKE_ACK;

@@ -385,29 +385,39 @@ public class UnityConnection extends TextWebSocketHandler {
 
         WebSocketSession targetSession = null;
         while (System.currentTimeMillis() < deadline) {
-            if (targetProjectId != null && projectConnections.containsKey(targetProjectId)) {
-                targetSession = projectConnections.get(targetProjectId).getSession();
-            }
-            if (targetSession == null || !targetSession.isOpen()) {
-                targetSession = this.unitySession;
-            }
-            if (targetSession == null || !targetSession.isOpen()) {
-                for (ProjectConnectionInfo info : projectConnections.values()) {
-                    if (info.getSession() != null && info.getSession().isOpen()) {
-                        targetSession = info.getSession();
-                        this.unitySession = targetSession;
-                        this.state = ConnectionState.READY;
+            if (targetProjectId != null) {
+                if (projectConnections.containsKey(targetProjectId)) {
+                    targetSession = projectConnections.get(targetProjectId).getSession();
+                    if (targetSession != null && targetSession.isOpen()) {
                         break;
                     }
                 }
-            }
-            if (targetSession != null && targetSession.isOpen()) {
-                break;
+                // Do NOT fall back to another project's session if a specific targetProjectId was requested
+            } else {
+                if (targetSession == null || !targetSession.isOpen()) {
+                    targetSession = this.unitySession;
+                }
+                if (targetSession == null || !targetSession.isOpen()) {
+                    for (ProjectConnectionInfo info : projectConnections.values()) {
+                        if (info.getSession() != null && info.getSession().isOpen()) {
+                            targetSession = info.getSession();
+                            this.unitySession = targetSession;
+                            this.state = ConnectionState.READY;
+                            break;
+                        }
+                    }
+                }
+                if (targetSession != null && targetSession.isOpen()) {
+                    break;
+                }
             }
             Thread.sleep(100);
         }
 
         if (targetSession == null || !targetSession.isOpen()) {
+            if (targetProjectId != null) {
+                throw new IllegalStateException("PROJECT_DISCONNECTED: Target project " + targetProjectId + " is not connected to Unity bridge");
+            }
             throw new IllegalStateException("No open Unity WebSocket session available for execution");
         }
 

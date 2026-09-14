@@ -1989,7 +1989,10 @@ public class Phase7Tools {
             return Map.of("type", "object", "properties", props, "required", List.of("tagName"));
         }
         @Override public String validate(Map<String, Object> parameters) {
-            if (parameters == null || !parameters.containsKey("tagName")) return "Parameter 'tagName' is required";
+            if (parameters == null || (!parameters.containsKey("tagName") && !parameters.containsKey("tag"))) return "Parameter 'tagName' is required";
+            if (parameters.containsKey("tag") && !parameters.containsKey("tagName")) {
+                parameters.put("tagName", parameters.get("tag"));
+            }
             return null;
         }
         @Override public ToolDefinition definition() {

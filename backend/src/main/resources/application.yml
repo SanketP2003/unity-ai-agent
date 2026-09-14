@@ -31,7 +31,7 @@ agent:
     base-url: ${AI_BASE_URL:}
     api-key: ${AI_API_KEY:}
     model: ${AI_MODEL:}
-    timeout-seconds: ${AI_TIMEOUT_SECONDS:75}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:180}
     temperature: ${AI_TEMPERATURE:0.7}
     max-tokens: ${AI_MAX_TOKENS:4096}
   openai:

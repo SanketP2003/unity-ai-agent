@@ -1,23 +1,27 @@
-# Autonomous Unity Agent
+# Autonomous Unity Agent & Game Studio
+
+# Java / Maven build output
 *.class
 *.jar
 *.war
 *.ear
 *.log
 target/
+!**/src/main/**
+!**/src/test/**
 !.mvn/wrapper/maven-wrapper.jar
 
-# Unity
-unity/Library/
-unity/Temp/
-unity/Obj/
-unity/Build/
-unity/Builds/
-unity/Logs/
-unity/UserSettings/
-unity/MemoryCaptures/
-unity/Recordings/
-unity/Assets/Plugins/Editor/JetBrains/
+# Unity generated caches and builds
+**/Library/
+**/Temp/
+**/Obj/
+**/Build/
+**/Builds/
+**/Logs/
+**/UserSettings/
+**/MemoryCaptures/
+**/Recordings/
+**/Assets/Plugins/Editor/JetBrains/
 *.pidb.meta
 *.pdb.meta
 *.mdb.meta
@@ -28,18 +32,45 @@ sysinfo.txt
 *.app
 crashlytics-build.properties
 
-# IDE
+# Studio runtime databases and quarantine
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+.unityagent/
+quarantine/
+
+# IDE and Editor Metadata
 .idea/
 .vs/
+.vscode/
 *.suo
 *.user
+*.userprefs
 *.csproj
 *.sln
 
-# OS
+# OS metadata
 .DS_Store
 Thumbs.db
+ehthumbs.db
 
-# Environment
+# Secrets & Local Configurations
 .env
+.env.*
 *.env.local
+*.key
+*.pem
+credentials/
+secrets/
+
+# Temporary and backup files
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.swp
+*.swo
+*~

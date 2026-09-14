@@ -87,4 +87,15 @@ class ToolArgumentValidatorTest {
         assertFalse(result.isValid());
         assertTrue(result.getErrorMessage().contains("exceeds maximum allowed length"));
     }
+
+    @Test
+    void testScriptContentWithSemicolonsAllowed() {
+        Map<String, Object> params = Map.of(
+                "path", "Assets/Scripts/Coin.cs",
+                "content", "using UnityEngine;\npublic class Coin { void Update() { if (a && b) { DoWork(); } } }"
+        );
+        ToolArgumentValidator.ValidationResult result = validator.validate("create_script", params);
+        assertTrue(result.isValid());
+        assertNull(result.getErrorMessage());
+    }
 }

@@ -167,7 +167,8 @@ namespace AutonomousUnityAgent.Editor.Tools
         public BridgeMessage Execute(BridgeMessage request)
         {
             string tagName = ToolParamHelper.ExtractString(request.parameters, "tag");
-            if (string.IsNullOrEmpty(tagName)) return BridgeMessage.Error(request.operationId, "MISSING_PARAM", "Parameter 'tag' is required");
+            if (string.IsNullOrEmpty(tagName)) tagName = ToolParamHelper.ExtractString(request.parameters, "tagName");
+            if (string.IsNullOrEmpty(tagName)) return BridgeMessage.Error(request.operationId, "MISSING_PARAM", "Parameter 'tag' or 'tagName' is required");
 
             UnityEditorInternal.InternalEditorUtility.AddTag(tagName);
 

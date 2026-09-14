@@ -35,6 +35,15 @@ public class ProductController {
     private final FirstRunSetupService firstRunSetupService;
     private final SystemRequirementsService systemRequirementsService;
     private final SecurityAuditService securityAuditService;
+    private final ProjectRegistrationService projectRegistrationService;
+    private final UnityProjectDetector unityProjectDetector;
+    private final com.unityagent.unity.ProjectRouter projectRouter;
+    private final ExtensionLifecycleService extensionLifecycleService;
+    private final ProjectHygieneService projectHygieneService;
+    private final RepositoryHygieneService repositoryHygieneService;
+    private final CleanupQuarantineService cleanupQuarantineService;
+    private final RepositoryCleanlinessGate repositoryCleanlinessGate;
+    private final ProjectHygieneGate projectHygieneGate;
 
     public ProductController(WorkspaceManager workspaceManager,
                              ProjectTemplateManager templateManager,
@@ -52,7 +61,25 @@ public class ProductController {
                              @org.springframework.beans.factory.annotation.Autowired(required = false)
                              SystemRequirementsService systemRequirementsService,
                              @org.springframework.beans.factory.annotation.Autowired(required = false)
-                             SecurityAuditService securityAuditService) {
+                             SecurityAuditService securityAuditService,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             ProjectRegistrationService projectRegistrationService,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             UnityProjectDetector unityProjectDetector,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             com.unityagent.unity.ProjectRouter projectRouter,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             ExtensionLifecycleService extensionLifecycleService,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             ProjectHygieneService projectHygieneService,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             RepositoryHygieneService repositoryHygieneService,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             CleanupQuarantineService cleanupQuarantineService,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             RepositoryCleanlinessGate repositoryCleanlinessGate,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             ProjectHygieneGate projectHygieneGate) {
         this.workspaceManager = workspaceManager;
         this.templateManager = templateManager;
         this.configurationManager = configurationManager;
@@ -67,6 +94,15 @@ public class ProductController {
         this.firstRunSetupService = firstRunSetupService;
         this.systemRequirementsService = systemRequirementsService;
         this.securityAuditService = securityAuditService;
+        this.projectRegistrationService = projectRegistrationService;
+        this.unityProjectDetector = unityProjectDetector;
+        this.projectRouter = projectRouter;
+        this.extensionLifecycleService = extensionLifecycleService;
+        this.projectHygieneService = projectHygieneService;
+        this.repositoryHygieneService = repositoryHygieneService;
+        this.cleanupQuarantineService = cleanupQuarantineService;
+        this.repositoryCleanlinessGate = repositoryCleanlinessGate;
+        this.projectHygieneGate = projectHygieneGate;
     }
 
     // ── Workspaces & Project Lifecycle ──────────────────────────────────────
@@ -404,5 +440,158 @@ public class ProductController {
             return ResponseEntity.ok(securityAuditService.auditPaths(List.of(Paths.get(targetPath))));
         }
         return ResponseEntity.ok(Map.of("clean", true));
+    }
+
+    // ── Phase 14: Universal Project Integration & Hygiene Endpoints ─────────
+
+    @PostMapping("/projects/detect")
+    public ResponseEntity<?> detectProject(@RequestBody Map<String, String> body) {
+        if (unityProjectDetector == null) return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", "Detector unavailable"));
+        String path = body.get("path");
+        var result = unityProjectDetector.detectProject(path);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/projects/register")
+    public ResponseEntity<?> registerProject(@RequestBody Map<String, String> body) {
+        if (projectRegistrationService == null) return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", "Registration service unavailable"));
+        String path = body.get("path");
+        String name = body.get("name");
+        String workspaceId = body.get("workspaceId");
+        try {
+            var record = projectRegistrationService.registerProject(path, name, workspaceId);
+            return ResponseEntity.ok(record);
+        } catch (IllegalArgumentException iae) {
+            return ResponseEntity.badRequest().body(Map.of("error", iae.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/projects")
+    public ResponseEntity<?> listRegisteredProjects() {
+        if (projectRegistrationService == null) return ResponseEntity.ok(List.of());
+        return ResponseEntity.ok(projectRegistrationService.listProjects());
+    }
+
+    @GetMapping("/projects/{projectId}")
+    public ResponseEntity<?> getProjectDetails(@PathVariable String projectId) {
+        if (projectRegistrationService == null) return ResponseEntity.notFound().build();
+        return projectRegistrationService.getProject(projectId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/projects/{projectId}/connect")
+    public ResponseEntity<?> checkOrConnectProject(@PathVariable String projectId) {
+        if (projectRouter == null) return ResponseEntity.ok(Map.of("connected", false));
+        boolean connected = projectRouter.isProjectConnected(projectId);
+        return ResponseEntity.ok(Map.of("projectId", projectId, "connected", connected));
+    }
+
+    @PostMapping("/projects/{projectId}/disconnect")
+    public ResponseEntity<?> disconnectProjectBridge(@PathVariable String projectId) {
+        if (projectRouter != null) {
+            projectRouter.disconnectProject(projectId);
+        }
+        return ResponseEntity.ok(Map.of("projectId", projectId, "status", "DISCONNECTED"));
+    }
+
+    @PostMapping("/projects/{projectId}/install-extension")
+    public ResponseEntity<?> installExtension(@PathVariable String projectId, @RequestBody(required = false) Map<String, String> body) {
+        if (extensionLifecycleService == null || projectRegistrationService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", "Lifecycle service unavailable"));
+        }
+        var projOpt = projectRegistrationService.getProject(projectId);
+        if (projOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        String packageSource = body != null ? body.get("packageSource") : null;
+        var result = extensionLifecycleService.installExtension(projOpt.get().getProjectPath(), packageSource);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/projects/{projectId}/uninstall-extension")
+    public ResponseEntity<?> uninstallExtension(@PathVariable String projectId, @RequestBody(required = false) Map<String, Object> body) {
+        if (extensionLifecycleService == null || projectRegistrationService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", "Lifecycle service unavailable"));
+        }
+        var projOpt = projectRegistrationService.getProject(projectId);
+        if (projOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        boolean removeIdentity = body != null && Boolean.TRUE.equals(body.get("removeIdentity"));
+        var result = extensionLifecycleService.uninstallExtension(projOpt.get().getProjectPath(), removeIdentity);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/projects/{projectId}/hygiene")
+    public ResponseEntity<?> checkProjectHygiene(@PathVariable String projectId) {
+        if (projectHygieneService == null || projectRegistrationService == null) {
+            return ResponseEntity.ok(Map.of("clean", true));
+        }
+        var projOpt = projectRegistrationService.getProject(projectId);
+        if (projOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        var report = projectHygieneService.performHygieneCheck(projOpt.get().getProjectPath());
+        return ResponseEntity.ok(report);
+    }
+
+    @PostMapping("/projects/{projectId}/hygiene/clean")
+    public ResponseEntity<?> cleanProjectPollution(@PathVariable String projectId, @RequestParam(defaultValue = "false") boolean dryRun) {
+        if (projectHygieneService == null || projectRegistrationService == null) {
+            return ResponseEntity.ok(Map.of("cleaned", 0));
+        }
+        var projOpt = projectRegistrationService.getProject(projectId);
+        if (projOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        int cleaned = projectHygieneService.cleanPollution(projOpt.get().getProjectPath(), dryRun);
+        return ResponseEntity.ok(Map.of("projectId", projectId, "cleaned", cleaned, "dryRun", dryRun));
+    }
+
+    // ── Phase 14.5 Repository Hygiene & Cleanliness Gates ───────────────────
+
+    @PostMapping("/cleanup/dry-run")
+    public ResponseEntity<?> performDryRunCleanup(@RequestBody(required = false) Map<String, String> body) {
+        if (repositoryHygieneService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", "Repository hygiene service unavailable"));
+        }
+        String root = (body != null && body.containsKey("rootPath")) ? body.get("rootPath") : ".";
+        var report = repositoryHygieneService.performDryRun(Paths.get(root));
+        return ResponseEntity.ok(report);
+    }
+
+    @PostMapping("/cleanup/execute")
+    public ResponseEntity<?> executeCleanup(@RequestBody(required = false) Map<String, String> body) {
+        if (repositoryHygieneService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", "Repository hygiene service unavailable"));
+        }
+        String root = (body != null && body.containsKey("rootPath")) ? body.get("rootPath") : ".";
+        var report = repositoryHygieneService.executeCleanup(Paths.get(root));
+        return ResponseEntity.ok(report);
+    }
+
+    @GetMapping("/cleanup/gate")
+    public ResponseEntity<?> evaluateRepositoryCleanliness(@RequestParam(defaultValue = ".") String rootPath) {
+        if (repositoryCleanlinessGate == null) {
+            return ResponseEntity.ok(Map.of("passed", true, "violations", List.of()));
+        }
+        var result = repositoryCleanlinessGate.evaluate(Paths.get(rootPath));
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/projects/{projectId}/hygiene-gate")
+    public ResponseEntity<?> evaluateProjectHygieneGate(@PathVariable String projectId) {
+        if (projectHygieneGate == null || projectRegistrationService == null) {
+            return ResponseEntity.ok(Map.of("passed", true, "violations", List.of()));
+        }
+        var projOpt = projectRegistrationService.getProject(projectId);
+        if (projOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        var result = projectHygieneGate.evaluate(Paths.get(projOpt.get().getProjectPath()));
+        return ResponseEntity.ok(result);
     }
 }

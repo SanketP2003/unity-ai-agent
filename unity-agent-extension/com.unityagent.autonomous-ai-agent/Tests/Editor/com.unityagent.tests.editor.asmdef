@@ -1,0 +1,25 @@
+{
+    "name": "com.unityagent.tests.editor",
+    "rootNamespace": "AutonomousUnityAgent.Tests.Editor",
+    "references": [
+        "com.unityagent.editor",
+        "com.unityagent.runtime",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
