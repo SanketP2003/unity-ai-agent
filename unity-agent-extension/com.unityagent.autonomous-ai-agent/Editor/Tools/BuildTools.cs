@@ -47,11 +47,24 @@ namespace AutonomousUnityAgent.Editor.Tools
                 return BridgeMessage.Error(request.operationId, "NO_SCENES", "No valid scenes configured in EditorBuildSettings or active scene");
             }
 
+            string platformStr = ToolParamHelper.ExtractString(request.parameters, "platform");
+            BuildTarget target = BuildTarget.StandaloneWindows64;
+            if (!string.IsNullOrEmpty(platformStr))
+            {
+                string norm = platformStr.ToUpperInvariant().Trim();
+                if (norm == "LINUX" || norm == "STANDALONELINUX64") target = BuildTarget.StandaloneLinux64;
+                else if (norm == "OSX" || norm == "STANDALONEOSX" || norm == "MACOS") target = BuildTarget.StandaloneOSX;
+                else if (norm == "ANDROID") target = BuildTarget.Android;
+                else if (norm == "WEBGL") target = BuildTarget.WebGL;
+                else if (norm == "IOS") target = BuildTarget.iOS;
+                else target = BuildTarget.StandaloneWindows64;
+            }
+
             BuildPlayerOptions buildOptions = new BuildPlayerOptions
             {
                 scenes = scenePaths.ToArray(),
                 locationPathName = outputPath,
-                target = BuildTarget.StandaloneWindows64,
+                target = target,
                 options = ToolParamHelper.ExtractBool(request.parameters, "development", false)
                     ? BuildOptions.Development
                     : BuildOptions.None
@@ -119,6 +132,43 @@ namespace AutonomousUnityAgent.Editor.Tools
                 + "\"validSceneCount\":" + validCount + ","
                 + "\"missingScenes\":[" + string.Join(",", missing.ConvertAll(m => "\"" + m + "\"")) + "]"
                 + "}";
+            return BridgeMessage.ToolResponse(request.operationId, ToolName, true, json);
+        }
+    }
+
+    public class GetPlatformCapabilitiesTool : IBridgeTool
+    {
+        public string ToolName => "get_platform_capabilities";
+
+        public BridgeMessage Execute(BridgeMessage request)
+        {
+            var list = new List<string>();
+
+            // Windows
+            bool winSupp = BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone, BuildTarget.StandaloneWindows64);
+            list.Add("{\"platform\":\"WINDOWS\",\"supported\":" + (winSupp ? "true" : "false") + ",\"moduleInstalled\":" + (winSupp ? "true" : "false") + ",\"buildAvailable\":" + (winSupp ? "true" : "false") + "}");
+
+            // Linux
+            bool linuxSupp = BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone, BuildTarget.StandaloneLinux64);
+            list.Add("{\"platform\":\"LINUX\",\"supported\":" + (linuxSupp ? "true" : "false") + ",\"moduleInstalled\":" + (linuxSupp ? "true" : "false") + ",\"buildAvailable\":" + (linuxSupp ? "true" : "false") + "}");
+
+            // OSX
+            bool osxSupp = BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone, BuildTarget.StandaloneOSX);
+            list.Add("{\"platform\":\"OSX\",\"supported\":" + (osxSupp ? "true" : "false") + ",\"moduleInstalled\":" + (osxSupp ? "true" : "false") + ",\"buildAvailable\":" + (osxSupp ? "true" : "false") + "}");
+
+            // Android
+            bool androidSupp = BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Android, BuildTarget.Android);
+            list.Add("{\"platform\":\"ANDROID\",\"supported\":" + (androidSupp ? "true" : "false") + ",\"moduleInstalled\":" + (androidSupp ? "true" : "false") + ",\"buildAvailable\":" + (androidSupp ? "true" : "false") + "}");
+
+            // WebGL
+            bool webglSupp = BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.WebGL, BuildTarget.WebGL);
+            list.Add("{\"platform\":\"WEBGL\",\"supported\":" + (webglSupp ? "true" : "false") + ",\"moduleInstalled\":" + (webglSupp ? "true" : "false") + ",\"buildAvailable\":" + (webglSupp ? "true" : "false") + "}");
+
+            // iOS
+            bool iosSupp = BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.iOS, BuildTarget.iOS);
+            list.Add("{\"platform\":\"IOS\",\"supported\":" + (iosSupp ? "true" : "false") + ",\"moduleInstalled\":" + (iosSupp ? "true" : "false") + ",\"buildAvailable\":" + (iosSupp ? "true" : "false") + "}");
+
+            string json = "{\"capabilities\":[" + string.Join(",", list) + "]}";
             return BridgeMessage.ToolResponse(request.operationId, ToolName, true, json);
         }
     }

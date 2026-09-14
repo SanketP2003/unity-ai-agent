@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Autonomous Unity Game Studio — Phase 11</title>
+  <title>Autonomous Unity Game Studio — Phase 12 Product & Distribution</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -103,6 +103,18 @@
           <button class="nav-item" data-view="view-diagnostics" id="nav-diagnostics" title="Centralized Diagnostics & Audit Trail">
             <span class="nav-icon">📊</span>
             <span class="nav-text">Diagnostics</span>
+          </button>
+          <button class="nav-item" data-view="view-releases" id="nav-releases" title="Release Management & Human Approval Boundary">
+            <span class="nav-icon">🏷️</span>
+            <span class="nav-text">Releases</span>
+          </button>
+          <button class="nav-item" data-view="view-backups" id="nav-backups" title="Backups, Restore & Packaging">
+            <span class="nav-icon">💾</span>
+            <span class="nav-text">Backups</span>
+          </button>
+          <button class="nav-item" data-view="view-settings" id="nav-settings" title="Product & Environment Settings">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-text">Settings</span>
           </button>
         </nav>
       </aside>
@@ -499,6 +511,128 @@
           </div>
         </div>
 
+        <!-- ── VIEW 9: Release Management & Human Approvals ───────────── -->
+        <div id="view-releases" class="studio-view hidden">
+          <div class="view-header">
+            <div>
+              <h2>Game Releases & Distribution</h2>
+              <span class="view-subtitle">Cryptographic validation, human approval boundary & atomic publication</span>
+            </div>
+            <div class="view-actions">
+              <button id="btn-create-release-modal" class="btn btn-primary">+ New Release Candidate</button>
+              <button id="btn-refresh-releases" class="btn btn-secondary">🔄 Refresh</button>
+            </div>
+          </div>
+
+          <div class="releases-container">
+            <div id="releases-list" class="releases-grid">
+              <!-- Dynamically loaded release cards -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ── VIEW 10: Backups, Restore & Portable Packaging ────────── -->
+        <div id="view-backups" class="studio-view hidden">
+          <div class="view-header">
+            <div>
+              <h2>Project Backups & Portable Packaging</h2>
+              <span class="view-subtitle">Zero-secret verified backups, safe rollback & .autonomous-project bundles</span>
+            </div>
+            <div class="view-actions">
+              <button id="btn-create-backup" class="btn btn-primary">💾 Create Backup</button>
+              <button id="btn-export-package" class="btn btn-secondary">📦 Export Package</button>
+              <button id="btn-import-package" class="btn btn-secondary">📥 Import Package</button>
+              <button id="btn-refresh-backups" class="btn btn-secondary">🔄 Refresh</button>
+            </div>
+          </div>
+
+          <div class="backups-container">
+            <div class="table-responsive">
+              <table class="studio-table" id="backups-table">
+                <thead>
+                  <tr>
+                    <th>Backup ID</th>
+                    <th>Project</th>
+                    <th>Archive Path</th>
+                    <th>SHA-256 Checksum</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="backups-tbody">
+                  <!-- Dynamically loaded -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── VIEW 11: Product, Environment & Platform Settings ──────── -->
+        <div id="view-settings" class="studio-view hidden">
+          <div class="view-header">
+            <div>
+              <h2>Studio & Environment Settings</h2>
+              <span class="view-subtitle">Platform build targets, environment configurations & diagnostics bundle</span>
+            </div>
+            <div class="view-actions">
+              <button id="btn-export-diagnostics-bundle" class="btn btn-secondary">📊 Export Diagnostics (.zip)</button>
+            </div>
+          </div>
+
+          <div class="settings-sections-grid">
+            <div class="card settings-card">
+              <h3>Unity Platform Build Capabilities</h3>
+              <p class="text-muted">Detected platform target modules available for builds on this host:</p>
+              <div id="platform-capabilities-list" class="capabilities-grid">
+                <!-- Dynamically loaded platform capability badges -->
+              </div>
+            </div>
+
+            <div class="card settings-card">
+              <h3>Environment Configuration Profiles</h3>
+              <p class="text-muted">Active profiles with zero-secret boundary guarantee:</p>
+              <div id="configuration-profiles-list" class="profiles-list">
+                <!-- Dynamically loaded configuration profiles -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Release Modal -->
+  <div id="release-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Create Release Candidate</h2>
+        <button id="btn-close-release-modal" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="rel-version">Semantic Version (e.g. 1.0.0, 1.2.0-rc1):</label>
+          <input type="text" id="rel-version" placeholder="1.0.0" />
+        </div>
+        <div class="form-group">
+          <label for="rel-channel">Release Channel:</label>
+          <select id="rel-channel">
+            <option value="DEVELOPMENT">Development</option>
+            <option value="ALPHA">Alpha</option>
+            <option value="BETA">Beta</option>
+            <option value="RC">Release Candidate (RC)</option>
+            <option value="STABLE" selected>Stable</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="rel-changelog">Changelog / Release Notes:</label>
+          <textarea id="rel-changelog" rows="3" placeholder="Release notes and changes..."></textarea>
+        </div>
+        <div id="rel-feedback" class="settings-feedback hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-submit-release" class="btn btn-primary">Create Candidate</button>
+        <button id="btn-cancel-release" class="btn btn-secondary">Cancel</button>
       </div>
     </div>
   </div>

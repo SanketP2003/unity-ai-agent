@@ -1803,3 +1803,212 @@ textarea#user-prompt {
   flex: 1;
   color: var(--text-main);
 }
+
+/* ── Phase 12: Releases & Approvals ──────────────────────────────────────── */
+
+.releases-container, .backups-container {
+  padding: 20px 24px;
+}
+
+.releases-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+}
+
+.release-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s;
+}
+
+.release-card:hover {
+  border-color: var(--border-focus);
+}
+
+.release-card.published {
+  border-left: 4px solid var(--accent-green);
+}
+
+.release-card.approved {
+  border-left: 4px solid var(--accent-blue);
+}
+
+.release-card.ready-for-review {
+  border-left: 4px solid var(--accent-amber);
+}
+
+.release-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.release-version-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.channel-pill {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.channel-development { background: #30363d; color: var(--text-muted); }
+.channel-alpha { background: rgba(163, 113, 247, 0.2); color: #d2a8ff; border: 1px solid #bc8cff; }
+.channel-beta { background: rgba(56, 139, 253, 0.2); color: #58a6ff; border: 1px solid #388bfd; }
+.channel-rc { background: rgba(210, 153, 34, 0.2); color: #e3b341; border: 1px solid #d29922; }
+.channel-stable { background: rgba(63, 185, 80, 0.2); color: #7ee787; border: 1px solid #3fb950; }
+
+.release-card-body {
+  font-size: 13px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.release-meta-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.release-notes-box {
+  background: var(--bg-card);
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  font-size: 12px;
+  color: var(--text-main);
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+.release-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ── Phase 12: Backups Table & Packaging ─────────────────────────────────── */
+
+.table-responsive {
+  overflow-x: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+
+.studio-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.studio-table th, .studio-table td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.studio-table th {
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.studio-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ── Phase 12: Settings & Platform Capabilities ──────────────────────────── */
+
+.settings-sections-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 20px;
+  padding: 20px 24px;
+}
+
+.settings-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.capabilities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.capability-chip {
+  padding: 8px 12px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.capability-supported {
+  background: rgba(63, 185, 80, 0.15);
+  color: #7ee787;
+  border: 1px solid rgba(63, 185, 80, 0.3);
+}
+
+.capability-unsupported {
+  background: rgba(139, 148, 158, 0.1);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.profiles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.profile-chip {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+

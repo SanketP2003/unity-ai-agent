@@ -1261,6 +1261,9 @@
     setupStudioBuilds();
     setupStudioAssetFilter();
     setupStudioDiagnosticsFilters();
+    setupStudioReleases();
+    setupStudioBackups();
+    setupStudioSettings();
 
     // Initial load
     loadStudioProjects();
@@ -1326,6 +1329,15 @@
         break;
       case 'view-diagnostics':
         loadStudioDiagnostics();
+        break;
+      case 'view-releases':
+        loadReleases(activeStudioProjectId);
+        break;
+      case 'view-backups':
+        loadBackups(activeStudioProjectId);
+        break;
+      case 'view-settings':
+        loadSettingsView(activeStudioProjectId);
         break;
       default:
         break;
@@ -2030,5 +2042,411 @@
     }
   }
 
+  // =========================================================================
+  // Phase 12 — Release Management, Backups & Settings
+  // =========================================================================
+
+  function setupStudioReleases() {
+    const btnCreateModal = document.getElementById('btn-create-release-modal');
+    const btnCloseModal = document.getElementById('btn-close-release-modal');
+    const btnCancelModal = document.getElementById('btn-cancel-release');
+    const btnSubmit = document.getElementById('btn-submit-release');
+    const btnRefresh = document.getElementById('btn-refresh-releases');
+    const modal = document.getElementById('release-modal');
+
+    if (btnCreateModal && modal) {
+      btnCreateModal.addEventListener('click', () => modal.classList.remove('hidden'));
+    }
+    if (btnCloseModal && modal) {
+      btnCloseModal.addEventListener('click', () => modal.classList.add('hidden'));
+    }
+    if (btnCancelModal && modal) {
+      btnCancelModal.addEventListener('click', () => modal.classList.add('hidden'));
+    }
+    if (btnSubmit) {
+      btnSubmit.addEventListener('click', handleCreateReleaseCandidate);
+    }
+    if (btnRefresh) {
+      btnRefresh.addEventListener('click', () => loadReleases(activeStudioProjectId));
+    }
+  }
+
+  async function loadReleases(projectId) {
+    const list = document.getElementById('releases-list');
+    if (!list) return;
+    list.innerHTML = '<div class="loading-spinner">Loading releases...</div>';
+
+    try {
+      const res = await fetch(`/api/product/projects/${encodeURIComponent(projectId)}/releases`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const releases = await res.json();
+
+      list.innerHTML = '';
+      if (!releases || releases.length === 0) {
+        list.innerHTML = '<div class="empty-note">No releases found for this project. Create a Release Candidate to begin.</div>';
+        return;
+      }
+
+      releases.forEach(rel => {
+        const card = document.createElement('div');
+        const statusClass = (rel.status || 'draft').toLowerCase().replace(/_/g, '-');
+        card.className = `release-card ${statusClass}`;
+
+        const isPublished = rel.status === 'PUBLISHED';
+        const isApproved = rel.status === 'APPROVED';
+        const isReadyForReview = rel.status === 'READY_FOR_REVIEW';
+        const isDraft = rel.status === 'DRAFT';
+
+        card.innerHTML = `
+          <div class="release-card-header">
+            <div class="release-version-title">
+              <span>v${escapeHtml(rel.versionString || '0.0.0')}</span>
+              <span class="channel-pill channel-${(rel.channel || 'development').toLowerCase()}">${escapeHtml(rel.channel || 'DEV')}</span>
+            </div>
+            <span class="badge badge-${statusClass}">${escapeHtml(rel.status || 'DRAFT')}</span>
+          </div>
+          <div class="release-card-body">
+            <div class="release-meta-row">
+              <span>Release ID:</span>
+              <code>${escapeHtml(rel.releaseId || '')}</code>
+            </div>
+            <div class="release-meta-row">
+              <span>Created:</span>
+              <span>${rel.createdAt ? new Date(rel.createdAt).toLocaleString() : 'N/A'}</span>
+            </div>
+            <div class="release-notes-box">
+              <strong>Notes:</strong> ${escapeHtml(rel.changelog || 'No notes provided')}
+            </div>
+          </div>
+          <div class="release-card-actions">
+            ${(isDraft || isReadyForReview) ? `
+              <button class="btn btn-small btn-secondary" onclick="window.approveReleaseCandidate('${escapeHtml(rel.releaseId)}')">
+                🛡️ Approve (Human)
+              </button>
+            ` : ''}
+            ${isApproved ? `
+              <button class="btn btn-small btn-primary" onclick="window.publishReleaseCandidate('${escapeHtml(rel.releaseId)}')">
+                🚀 Publish
+              </button>
+            ` : ''}
+            ${isPublished ? `
+              <button class="btn btn-small btn-danger" onclick="window.rollbackReleaseCandidate('${escapeHtml(rel.releaseId)}')">
+                ⏮️ Rollback
+              </button>
+            ` : ''}
+          </div>
+        `;
+        list.appendChild(card);
+      });
+    } catch (e) {
+      list.innerHTML = `<div class="error-note">Failed to load releases: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  async function handleCreateReleaseCandidate() {
+    const version = document.getElementById('rel-version')?.value.trim();
+    const channel = document.getElementById('rel-channel')?.value;
+    const changelog = document.getElementById('rel-changelog')?.value.trim();
+    const feedback = document.getElementById('rel-feedback');
+
+    if (!version) {
+      if (feedback) {
+        feedback.textContent = 'Version string is required (e.g. 1.0.0)';
+        feedback.classList.remove('hidden');
+      }
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/product/projects/${encodeURIComponent(activeStudioProjectId)}/releases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version, channel, changelog })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      document.getElementById('release-modal')?.classList.add('hidden');
+      loadReleases(activeStudioProjectId);
+    } catch (e) {
+      if (feedback) {
+        feedback.textContent = e.message;
+        feedback.classList.remove('hidden');
+      }
+    }
+  }
+
+  window.approveReleaseCandidate = async function(releaseId) {
+    if (!confirm('Approve release as Human Lead? Automated agents and LLMs are strictly forbidden from approving.')) return;
+    try {
+      const res = await fetch(`/api/product/releases/${encodeURIComponent(releaseId)}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'OWNER', reviewerId: 'studio_lead', notes: 'Approved via Studio UI' })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      loadReleases(activeStudioProjectId);
+    } catch (e) {
+      alert('Approval failed: ' + e.message);
+    }
+  };
+
+  window.publishReleaseCandidate = async function(releaseId) {
+    const artifactId = prompt('Enter Build Artifact ID to publish with this release (e.g. from Builds tab):');
+    if (!artifactId) return;
+
+    try {
+      const res = await fetch(`/api/product/releases/${encodeURIComponent(releaseId)}/publish?projectId=${encodeURIComponent(activeStudioProjectId)}&artifactId=${encodeURIComponent(artifactId)}`, {
+        method: 'POST'
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      alert('Release published successfully! Cryptographic signature verified and release locked.');
+      loadReleases(activeStudioProjectId);
+    } catch (e) {
+      alert('Publish failed: ' + e.message);
+    }
+  };
+
+  window.rollbackReleaseCandidate = async function(releaseId) {
+    if (!confirm('Rollback this release? Status will be updated to ROLLED_BACK.')) return;
+    try {
+      const res = await fetch(`/api/product/releases/${encodeURIComponent(releaseId)}/rollback?projectId=${encodeURIComponent(activeStudioProjectId)}`, {
+        method: 'POST'
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      loadReleases(activeStudioProjectId);
+    } catch (e) {
+      alert('Rollback failed: ' + e.message);
+    }
+  };
+
+  // Backups & Packaging
+  function setupStudioBackups() {
+    const btnCreate = document.getElementById('btn-create-backup');
+    const btnExport = document.getElementById('btn-export-package');
+    const btnImport = document.getElementById('btn-import-package');
+    const btnRefresh = document.getElementById('btn-refresh-backups');
+
+    if (btnCreate) {
+      btnCreate.addEventListener('click', () => handleCreateBackup(activeStudioProjectId));
+    }
+    if (btnExport) {
+      btnExport.addEventListener('click', () => handleExportPackage(activeStudioProjectId));
+    }
+    if (btnImport) {
+      btnImport.addEventListener('click', handleImportPackage);
+    }
+    if (btnRefresh) {
+      btnRefresh.addEventListener('click', () => loadBackups(activeStudioProjectId));
+    }
+  }
+
+  async function loadBackups(projectId) {
+    const tbody = document.getElementById('backups-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading backups...</td></tr>';
+
+    try {
+      const res = await fetch(`/api/product/projects/${encodeURIComponent(projectId)}/backups`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const backups = await res.json();
+
+      tbody.innerHTML = '';
+      if (!backups || backups.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No backups found for this project.</td></tr>';
+        return;
+      }
+
+      backups.forEach(b => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><code>${escapeHtml(b.backupId || '')}</code></td>
+          <td>${escapeHtml(b.projectId || '')}</td>
+          <td>${escapeHtml(b.archivePath || '')}</td>
+          <td><code>${escapeHtml((b.checksum || '').substring(0, 16))}...</code></td>
+          <td>${b.createdAt ? new Date(b.createdAt).toLocaleString() : 'N/A'}</td>
+          <td>
+            <button class="btn btn-small btn-secondary" onclick="window.restoreStudioBackup('${escapeHtml(b.backupId)}')">
+              ⏮️ Restore
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center error-text">Failed to load backups: ${escapeHtml(e.message)}</td></tr>`;
+    }
+  }
+
+  async function handleCreateBackup(projectId) {
+    try {
+      const res = await fetch(`/api/product/projects/${encodeURIComponent(projectId)}/backups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      alert('Backup created successfully! Zero-secret guarantee verified.');
+      loadBackups(projectId);
+    } catch (e) {
+      alert('Backup creation failed: ' + e.message);
+    }
+  }
+
+  window.restoreStudioBackup = async function(backupId) {
+    if (!confirm(`Restore project from backup ${backupId}? Current workspace files may be replaced.`)) return;
+    try {
+      const res = await fetch(`/api/product/projects/${encodeURIComponent(activeStudioProjectId)}/backups/${encodeURIComponent(backupId)}/restore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      alert(`Restore result: ${data.status} — ${data.summary}`);
+    } catch (e) {
+      alert('Restore failed: ' + e.message);
+    }
+  };
+
+  async function handleExportPackage(projectId) {
+    try {
+      const res = await fetch(`/api/product/projects/${encodeURIComponent(projectId)}/package/export`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      alert(`Project successfully exported to portable package: ${data.exportedFile}`);
+    } catch (e) {
+      alert('Export failed: ' + e.message);
+    }
+  }
+
+  async function handleImportPackage() {
+    const path = prompt('Enter path to .autonomous-project package file to import:');
+    if (!path) return;
+
+    try {
+      const res = await fetch('/api/product/projects/package/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packageFile: path })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      alert('Project package imported successfully!');
+      loadStudioProjects();
+    } catch (e) {
+      alert('Import failed: ' + e.message);
+    }
+  }
+
+  // Settings & Capabilities
+  function setupStudioSettings() {
+    const btnDiagExport = document.getElementById('btn-export-diagnostics-bundle');
+    if (btnDiagExport) {
+      btnDiagExport.addEventListener('click', handleExportDiagnosticsBundle);
+    }
+  }
+
+  async function loadSettingsView(projectId) {
+    // 1. Platform capabilities
+    const capList = document.getElementById('platform-capabilities-list');
+    if (capList) {
+      capList.innerHTML = '<div>Scanning capabilities...</div>';
+      try {
+        const res = await fetch(`/api/product/projects/${encodeURIComponent(projectId)}/capabilities`);
+        if (res.ok) {
+          const caps = await res.json();
+          capList.innerHTML = '';
+          Object.values(caps).forEach(cap => {
+            const chip = document.createElement('div');
+            chip.className = `capability-chip ${cap.buildTargetAvailable ? 'capability-supported' : 'capability-unsupported'}`;
+            chip.innerHTML = `
+              <span>${escapeHtml(cap.platform || '')}</span>
+              <span>${cap.buildTargetAvailable ? '✅ Ready' : '❌ Missing'}</span>
+            `;
+            capList.appendChild(chip);
+          });
+        }
+      } catch (e) {
+        capList.innerHTML = `<div class="error-note">Failed: ${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    // 2. Configuration profiles
+    const profList = document.getElementById('configuration-profiles-list');
+    if (profList) {
+      profList.innerHTML = '<div>Loading profiles...</div>';
+      try {
+        const res = await fetch(`/api/product/projects/${encodeURIComponent(projectId)}/configurations`);
+        if (res.ok) {
+          const profs = await res.json();
+          profList.innerHTML = '';
+          if (!profs || profs.length === 0) {
+            profList.innerHTML = '<div class="empty-note">No profiles configured. Profiles strictly enforce zero-secret storage.</div>';
+          } else {
+            profs.forEach(p => {
+              const chip = document.createElement('div');
+              chip.className = 'profile-chip';
+              chip.innerHTML = `
+                <div>
+                  <strong>${escapeHtml(p.profileName || '')}</strong>
+                  <span class="text-muted">(${escapeHtml(p.environment || '')})</span>
+                </div>
+                <code>${escapeHtml(p.profileId || '')}</code>
+              `;
+              profList.appendChild(chip);
+            });
+          }
+        }
+      } catch (e) {
+        profList.innerHTML = `<div class="error-note">Failed: ${escapeHtml(e.message)}</div>`;
+      }
+    }
+  }
+
+  async function handleExportDiagnosticsBundle() {
+    try {
+      const res = await fetch('/api/product/diagnostics/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      alert(`Diagnostics bundle successfully exported to: ${data.bundlePath}`);
+    } catch (e) {
+      alert('Export failed: ' + e.message);
+    }
+  }
+
 })();
+
 

@@ -15,6 +15,8 @@ logging:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
 
 spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:development}
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -61,3 +63,44 @@ memory:
   max-recent-conversations: 5
   max-scripts-in-context: 20
   stale-threshold-hours: 24
+
+---
+# ── Development Profile ───────────────────────────────────────────────
+spring:
+  config:
+    activate:
+      on-profile: development
+
+logging:
+  level:
+    root: INFO
+    com.unityagent: DEBUG
+
+---
+# ── Testing Profile ───────────────────────────────────────────────────
+spring:
+  config:
+    activate:
+      on-profile: testing
+
+memory:
+  database-path: ":memory:"
+
+logging:
+  level:
+    root: WARN
+    com.unityagent: INFO
+
+---
+# ── Production Profile ────────────────────────────────────────────────
+spring:
+  config:
+    activate:
+      on-profile: production
+
+logging:
+  level:
+    root: WARN
+    com.unityagent: INFO
+  pattern:
+    console: '{"time":"%d{yyyy-MM-dd HH:mm:ss.SSS}","level":"%-5level","logger":"%logger{36}","msg":"%replace(%msg){"[\r\n]+"," "}"}%n'

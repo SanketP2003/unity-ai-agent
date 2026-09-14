@@ -6,6 +6,7 @@ import com.unityagent.agent.goal.GameGoal;
 import com.unityagent.agent.plan.AgentPlan;
 import com.unityagent.agent.provider.AIProvider;
 import com.unityagent.memory.MemoryDatabase;
+import com.unityagent.memory.MemoryRepository;
 import com.unityagent.memory.MemorySchema;
 import com.unityagent.memory.SQLiteMemoryRepository;
 import com.unityagent.memory.model.ProjectMemory;
@@ -38,7 +39,7 @@ class StudioProjectTest {
     Path tempDir;
 
     private MemoryDatabase db;
-    private SQLiteMemoryRepository repository;
+    private MemoryRepository repository;
     private UnityConnection unityConnection;
     private AutonomousRunController runController;
     private AIProvider aiProvider;
@@ -67,7 +68,7 @@ class StudioProjectTest {
 
     @Test
     void testSchemaV3TablesCreated() throws Exception {
-        assertEquals(3, MemorySchema.CURRENT_VERSION);
+        assertTrue(MemorySchema.CURRENT_VERSION >= 3);
         try (Connection conn = db.getConnection();
              Statement stmt = conn.createStatement()) {
             // Verify Phase 11 tables exist

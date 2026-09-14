@@ -249,10 +249,11 @@ namespace AutonomousUnityAgent.Editor
             _toolDispatcher.Register(new GetTagsTool());
             _toolDispatcher.Register(new CreateTagTool());
 
-            // Phase 7P: Build Pipeline tools
+            // Phase 7P / Phase 12: Build Pipeline tools
             _toolDispatcher.Register(new BuildProjectTool());
             _toolDispatcher.Register(new GetBuildResultTool());
             _toolDispatcher.Register(new ValidateBuildSettingsTool());
+            _toolDispatcher.Register(new GetPlatformCapabilitiesTool());
 
             // Hook into the Editor update loop to process messages on the main thread
             EditorApplication.update += OnEditorUpdate;

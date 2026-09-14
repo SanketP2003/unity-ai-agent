@@ -9,7 +9,7 @@ public final class MemorySchema {
 
     private MemorySchema() {}
 
-    public static final int CURRENT_VERSION = 3;
+    public static final int CURRENT_VERSION = 4;
 
     // ── Schema versioning ──────────────────────────────────────────────
 
@@ -281,6 +281,116 @@ public final class MemorySchema {
             )
             """;
 
+    // ── Phase 12: Product & Distribution Tables ───────────────────────
+
+    public static final String CREATE_WORKSPACES = """
+            CREATE TABLE IF NOT EXISTS workspaces (
+                workspace_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                root_path TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT
+            )
+            """;
+
+    public static final String CREATE_WORKSPACE_PROJECTS = """
+            CREATE TABLE IF NOT EXISTS workspace_projects (
+                project_id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                lifecycle_state TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT,
+                FOREIGN KEY (project_id) REFERENCES projects(project_id),
+                FOREIGN KEY (workspace_id) REFERENCES workspaces(workspace_id)
+            )
+            """;
+
+    public static final String CREATE_PROJECT_TEMPLATES = """
+            CREATE TABLE IF NOT EXISTS project_templates (
+                template_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                unity_version TEXT,
+                required_packages TEXT,
+                default_scenes TEXT,
+                supported_platforms TEXT,
+                version TEXT NOT NULL
+            )
+            """;
+
+    public static final String CREATE_CONFIGURATION_PROFILES = """
+            CREATE TABLE IF NOT EXISTS configuration_profiles (
+                profile_id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                profile_name TEXT NOT NULL,
+                environment TEXT NOT NULL,
+                settings_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (project_id) REFERENCES projects(project_id)
+            )
+            """;
+
+    public static final String CREATE_GAME_RELEASES = """
+            CREATE TABLE IF NOT EXISTS game_releases (
+                release_id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                version_string TEXT NOT NULL,
+                channel TEXT NOT NULL,
+                status TEXT NOT NULL,
+                build_id TEXT,
+                validation_report_json TEXT,
+                approval_record_json TEXT,
+                changelog TEXT,
+                is_immutable INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL,
+                published_at TEXT,
+                FOREIGN KEY (project_id) REFERENCES projects(project_id)
+            )
+            """;
+
+    public static final String CREATE_BUILD_ARTIFACTS = """
+            CREATE TABLE IF NOT EXISTS build_artifacts (
+                artifact_id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                release_id TEXT,
+                platform TEXT NOT NULL,
+                architecture TEXT,
+                relative_path TEXT NOT NULL,
+                size_bytes INTEGER NOT NULL,
+                sha256_checksum TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (project_id) REFERENCES projects(project_id)
+            )
+            """;
+
+    public static final String CREATE_BACKUPS = """
+            CREATE TABLE IF NOT EXISTS backups (
+                backup_id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                archive_path TEXT NOT NULL,
+                manifest_json TEXT NOT NULL,
+                checksum TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (project_id) REFERENCES projects(project_id)
+            )
+            """;
+
+    public static final String CREATE_DEPLOYMENT_RECORDS = """
+            CREATE TABLE IF NOT EXISTS deployment_records (
+                deployment_id TEXT PRIMARY KEY,
+                release_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                target_name TEXT NOT NULL,
+                provider_type TEXT NOT NULL,
+                status TEXT NOT NULL,
+                target_location TEXT,
+                created_at TEXT NOT NULL,
+                completed_at TEXT,
+                FOREIGN KEY (project_id) REFERENCES projects(project_id),
+                FOREIGN KEY (release_id) REFERENCES game_releases(release_id)
+            )
+            """;
+
     // ── Indexes ────────────────────────────────────────────────────────
 
     public static final String[] CREATE_INDEXES = {
@@ -300,7 +410,16 @@ public final class MemorySchema {
         "CREATE INDEX IF NOT EXISTS idx_build_records_project ON build_records(project_id)",
         "CREATE INDEX IF NOT EXISTS idx_audit_events_project ON audit_events(project_id)",
         "CREATE INDEX IF NOT EXISTS idx_audit_events_time ON audit_events(timestamp)",
-        "CREATE INDEX IF NOT EXISTS idx_notifications_project ON studio_notifications(project_id)"
+        "CREATE INDEX IF NOT EXISTS idx_notifications_project ON studio_notifications(project_id)",
+        "CREATE INDEX IF NOT EXISTS idx_workspace_projects_ws ON workspace_projects(workspace_id)",
+        "CREATE INDEX IF NOT EXISTS idx_workspace_projects_state ON workspace_projects(lifecycle_state)",
+        "CREATE INDEX IF NOT EXISTS idx_config_profiles_proj ON configuration_profiles(project_id)",
+        "CREATE INDEX IF NOT EXISTS idx_game_releases_proj ON game_releases(project_id)",
+        "CREATE INDEX IF NOT EXISTS idx_game_releases_version ON game_releases(project_id, version_string)",
+        "CREATE INDEX IF NOT EXISTS idx_build_artifacts_proj ON build_artifacts(project_id)",
+        "CREATE INDEX IF NOT EXISTS idx_build_artifacts_rel ON build_artifacts(release_id)",
+        "CREATE INDEX IF NOT EXISTS idx_backups_proj ON backups(project_id)",
+        "CREATE INDEX IF NOT EXISTS idx_deployments_rel ON deployment_records(release_id)"
     };
 
     /** All table DDL statements in order. */
@@ -320,6 +439,14 @@ public final class MemorySchema {
         CREATE_CHANGE_ENTRIES,
         CREATE_BUILD_RECORDS,
         CREATE_AUDIT_EVENTS,
-        CREATE_STUDIO_NOTIFICATIONS
+        CREATE_STUDIO_NOTIFICATIONS,
+        CREATE_WORKSPACES,
+        CREATE_WORKSPACE_PROJECTS,
+        CREATE_PROJECT_TEMPLATES,
+        CREATE_CONFIGURATION_PROFILES,
+        CREATE_GAME_RELEASES,
+        CREATE_BUILD_ARTIFACTS,
+        CREATE_BACKUPS,
+        CREATE_DEPLOYMENT_RECORDS
     };
 }
