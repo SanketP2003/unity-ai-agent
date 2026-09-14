@@ -58,9 +58,11 @@ public class ProjectPackageService {
                         for (Path p : (Iterable<Path>) stream::iterator) {
                             if (Files.isRegularFile(p)) {
                                 String rel = projectRoot.relativize(p).toString().replace('\\', '/');
-                                // Exclude secrets and build caches
-                                if (rel.contains(".key") || rel.contains("secret") || rel.startsWith("Library")
-                                        || rel.startsWith("Temp") || rel.startsWith("Builds")) {
+                                String relLower = rel.toLowerCase();
+                                // Exclude secrets, credentials, and build caches
+                                if (relLower.contains(".key") || relLower.contains("secret") || relLower.contains("credential")
+                                        || relLower.contains(".env") || relLower.contains("token")
+                                        || rel.startsWith("Library") || rel.startsWith("Temp") || rel.startsWith("Builds")) {
                                     continue;
                                 }
                                 zos.putNextEntry(new ZipEntry("content/" + rel));

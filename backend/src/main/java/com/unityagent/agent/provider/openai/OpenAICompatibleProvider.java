@@ -191,10 +191,19 @@ public class OpenAICompatibleProvider implements AIProvider {
                 );
             }
 
+            if (status == 404) {
+                log.error("OpenAI-compatible endpoint or model not found (404)");
+                throw new AIProviderException(
+                        "Endpoint or model not found on OpenAI-compatible provider (404): " + scrub(responseBody),
+                        ErrorType.PROVIDER_ERROR,
+                        404
+                );
+            }
+
             if (status == 429) {
                 log.warn("Rate limit exceeded for OpenAI-compatible endpoint (429)");
                 throw new AIProviderException(
-                        "Rate limit exceeded on OpenAI-compatible endpoint (429): " + responseBody,
+                        "Rate limit exceeded on OpenAI-compatible endpoint (429): " + scrub(responseBody),
                         ErrorType.PROVIDER_ERROR,
                         429
                 );
@@ -203,24 +212,33 @@ public class OpenAICompatibleProvider implements AIProvider {
             if (status == 400) {
                 String bodyLower = responseBody != null ? responseBody.toLowerCase() : "";
                 if (bodyLower.contains("tool") && (bodyLower.contains("not supported") || bodyLower.contains("unsupported") || bodyLower.contains("failed to parse"))) {
-                    log.error("Model '{}' does not support compatible tool calling: {}", model, responseBody);
+                    log.error("Model '{}' does not support compatible tool calling: {}", model, scrub(responseBody));
                     throw new AIProviderException(
-                            "Selected model does not provide compatible tool-calling support: " + responseBody,
+                            "Selected model does not provide compatible tool-calling support: " + scrub(responseBody),
                             ErrorType.PROVIDER_ERROR,
                             400
                     );
                 }
                 throw new AIProviderException(
-                        "Bad request to OpenAI-compatible endpoint (400): " + responseBody,
+                        "Bad request to OpenAI-compatible endpoint (400): " + scrub(responseBody),
                         ErrorType.PROVIDER_ERROR,
                         400
                 );
             }
 
-            if (status >= 400) {
-                log.error("OpenAI-compatible endpoint returned error {}: {}", status, responseBody);
+            if (status >= 500) {
+                log.error("OpenAI-compatible provider unavailable ({}): {}", status, scrub(responseBody));
                 throw new AIProviderException(
-                        "OpenAI-compatible endpoint returned error (" + status + "): " + responseBody,
+                        "OpenAI-compatible provider unavailable (" + status + "): " + scrub(responseBody),
+                        ErrorType.PROVIDER_ERROR,
+                        status
+                );
+            }
+
+            if (status >= 400) {
+                log.error("OpenAI-compatible endpoint returned error {}: {}", status, scrub(responseBody));
+                throw new AIProviderException(
+                        "OpenAI-compatible endpoint returned error (" + status + "): " + scrub(responseBody),
                         ErrorType.PROVIDER_ERROR,
                         status
                 );
@@ -245,12 +263,20 @@ public class OpenAICompatibleProvider implements AIProvider {
             log.error("Request to OpenAI-compatible endpoint timed out after {}s", timeoutSeconds);
             throw new AIProviderException("Request to OpenAI-compatible endpoint timed out after " + timeoutSeconds + "s", ErrorType.TIMEOUT, 408);
         } catch (ConnectException e) {
-            log.error("Failed to connect to OpenAI-compatible endpoint: {}", e.getMessage());
-            throw new AIProviderException("OpenAI-compatible provider unavailable (connection refused): " + e.getMessage(), ErrorType.PROVIDER_ERROR, 503);
+            log.error("Failed to connect to OpenAI-compatible endpoint: {}", scrub(e.getMessage()));
+            throw new AIProviderException("OpenAI-compatible provider unavailable (connection refused): " + scrub(e.getMessage()), ErrorType.PROVIDER_ERROR, 503);
         } catch (Exception e) {
-            log.error("OpenAI-compatible completion failed: {}", e.getMessage(), e);
-            throw new AIProviderException("Failed to generate OpenAI-compatible completion: " + e.getMessage(), e);
+            log.error("OpenAI-compatible completion failed: {}", scrub(e.getMessage()), e);
+            throw new AIProviderException("Failed to generate OpenAI-compatible completion: " + scrub(e.getMessage()), e);
         }
+    }
+
+    public static String scrub(String input) {
+        if (input == null) return "";
+        return input.replaceAll("Bearer\\s+([A-Za-z0-9_\\-\\.]+)", "Bearer [SCRUBBED]")
+                .replaceAll("(?i)(api[_-]?key[\"':\\s=]+)([A-Za-z0-9_\\-\\.]+)", "$1[SCRUBBED]")
+                .replaceAll("sk-[A-Za-z0-9_\\-]{15,}", "sk-[SCRUBBED]")
+                .replaceAll("nvapi-[A-Za-z0-9_\\-]{15,}", "nvapi-[SCRUBBED]");
     }
 
     @Override

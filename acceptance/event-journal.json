@@ -1,0 +1,71 @@
+[
+  {
+    "eventId": "evt_001",
+    "timestamp": "2026-09-14T12:12:00.120Z",
+    "type": "RUN_STARTED",
+    "details": { "sessionId": "session_acceptance_master", "prompt": "Create 2D retro platformer..." }
+  },
+  {
+    "eventId": "evt_002",
+    "timestamp": "2026-09-14T12:12:01.320Z",
+    "type": "STAGE_TRANSITION",
+    "stage": "PLANNING",
+    "details": { "planSteps": 4, "objective": "Decompose into Player, Platforms, Collectables, Hazards, UI" }
+  },
+  {
+    "eventId": "evt_003",
+    "timestamp": "2026-09-14T12:12:02.500Z",
+    "type": "STAGE_TRANSITION",
+    "stage": "BUILDING",
+    "details": { "action": "Creating GameObjects and attaching colliders" }
+  },
+  {
+    "eventId": "evt_004",
+    "timestamp": "2026-09-14T12:12:04.210Z",
+    "type": "TOOL_INVOCATION",
+    "tool": "create_gameobject",
+    "params": { "name": "Player", "components": ["Rigidbody2D", "BoxCollider2D", "PlayerController2D"] }
+  },
+  {
+    "eventId": "evt_005",
+    "timestamp": "2026-09-14T12:12:06.100Z",
+    "type": "STAGE_TRANSITION",
+    "stage": "COMPILING",
+    "details": { "action": "Triggering Roslyn compiler" }
+  },
+  {
+    "eventId": "evt_006",
+    "timestamp": "2026-09-14T12:12:08.200Z",
+    "type": "COMPILER_RESULT",
+    "errors": 0,
+    "warnings": 0,
+    "status": "CLEAN"
+  },
+  {
+    "eventId": "evt_007",
+    "timestamp": "2026-09-14T12:12:08.650Z",
+    "type": "STAGE_TRANSITION",
+    "stage": "TESTING",
+    "details": { "action": "Entering Play Mode for 3500ms simulation" }
+  },
+  {
+    "eventId": "evt_008",
+    "timestamp": "2026-09-14T12:12:12.150Z",
+    "type": "STAGE_TRANSITION",
+    "stage": "VALIDATING",
+    "details": { "action": "CompletionGate authoritative verification" }
+  },
+  {
+    "eventId": "evt_009",
+    "timestamp": "2026-09-14T12:12:14.350Z",
+    "type": "COMPLETION_GATE_VERDICT",
+    "verdict": "PASSED",
+    "details": { "requiredRequirements": 5, "satisfied": 5, "runtimeErrors": 0 }
+  },
+  {
+    "eventId": "evt_010",
+    "timestamp": "2026-09-14T12:12:14.370Z",
+    "type": "RUN_COMPLETED",
+    "status": "COMPLETED"
+  }
+]

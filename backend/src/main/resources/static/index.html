@@ -54,6 +54,10 @@
           ⚡ Autonomy DAG
         </button>
 
+        <button id="btn-open-wizard" class="btn btn-secondary" title="First-Run Setup & Environment Diagnostics">
+          🚀 Setup Wizard
+        </button>
+
         <button id="btn-open-settings" class="btn btn-secondary" title="Configure AI Provider and Credentials">
           ⚙️ Settings
         </button>
@@ -678,6 +682,90 @@
       <div class="modal-footer">
         <button id="btn-save-settings" class="btn btn-primary">Save & Apply</button>
         <button id="btn-cancel-settings" class="btn btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- First-Run Setup & Diagnostics Wizard Modal -->
+  <div id="wizard-modal" class="modal-overlay hidden">
+    <div class="modal-card wizard-modal-card">
+      <div class="modal-header">
+        <h2>🚀 First-Run Setup & Environment Diagnostics</h2>
+        <button id="btn-close-wizard" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="wizard-grid">
+          <!-- Card 1: System Requirements -->
+          <div class="wizard-card">
+            <h3><span>💻 System Requirements</span><span id="wiz-sys-badge" class="badge">Checking...</span></h3>
+            <div id="wiz-sys-list" class="wizard-check-list">
+              <div class="wizard-check-item"><span>Java 21+ Runtime:</span> <strong id="wiz-java">-</strong></div>
+              <div class="wizard-check-item"><span>Max Memory:</span> <strong id="wiz-memory">-</strong></div>
+              <div class="wizard-check-item"><span>Free Disk:</span> <strong id="wiz-disk">-</strong></div>
+              <div class="wizard-check-item"><span>Filesystem Writable:</span> <strong id="wiz-write">-</strong></div>
+              <div class="wizard-check-item"><span>SQLite Supported:</span> <strong id="wiz-sqlite">-</strong></div>
+            </div>
+          </div>
+
+          <!-- Card 2: AI Provider -->
+          <div class="wizard-card">
+            <h3><span>🤖 AI Provider</span><span id="wiz-prov-badge" class="badge">Unconfigured</span></h3>
+            <div class="form-group" style="margin-top: 8px;">
+              <label for="wiz-provider-select">Provider Profile:</label>
+              <select id="wiz-provider-select">
+                <option value="nvidia">NVIDIA NIM (OpenAI-Compatible)</option>
+                <option value="openai">OpenAI (Official)</option>
+                <option value="ollama">Ollama (Local)</option>
+                <option value="vllm">vLLM (Self-Hosted)</option>
+                <option value="custom">Custom Endpoint</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="wiz-api-key">API Key (Masked / Optional override):</label>
+              <input type="password" id="wiz-api-key" placeholder="Enter API key" />
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <button id="btn-wiz-test-prov" class="btn btn-small btn-primary">Test Provider Connection</button>
+            </div>
+            <div id="wiz-prov-feedback" class="settings-feedback hidden" style="margin-top: 8px;"></div>
+          </div>
+
+          <!-- Card 3: Unity Connection -->
+          <div class="wizard-card">
+            <h3><span>🎮 Unity Connection</span><span id="wiz-unity-badge" class="badge">Disconnected</span></h3>
+            <div class="wizard-check-list">
+              <div class="wizard-check-item"><span>Bridge State:</span> <strong id="wiz-unity-state">-</strong></div>
+              <div class="wizard-check-item"><span>Connected Projects:</span> <strong id="wiz-unity-projects">0</strong></div>
+              <p class="field-hint" style="margin-top: 8px;">
+                Ensure Unity Editor has the <code>com.unityagent.autonomous-ai-agent</code> package installed and active.
+              </p>
+            </div>
+          </div>
+
+          <!-- Card 4: Security Audit -->
+          <div class="wizard-card">
+            <h3><span>🛡️ Zero-Secret Security</span><span id="wiz-sec-badge" class="badge badge-success">Clean</span></h3>
+            <p class="field-hint">
+              Audits workspace files, SQLite database, configs, and logs to ensure no plaintext API keys or credentials exist.
+            </p>
+            <div style="margin-top: 12px;">
+              <button id="btn-wiz-run-audit" class="btn btn-small btn-secondary">Run Zero-Secret Audit</button>
+            </div>
+            <div id="wiz-sec-feedback" class="settings-feedback hidden" style="margin-top: 8px;"></div>
+          </div>
+        </div>
+
+        <!-- Overall Readiness Banner -->
+        <div id="wiz-readiness-banner" class="wizard-status-banner not-ready">
+          <div>
+            <span id="wiz-readiness-title">Studio Status: NOT READY</span>
+            <div id="wiz-readiness-desc" style="font-weight: 400; font-size: 12px; margin-top: 4px;">Checking prerequisites...</div>
+          </div>
+          <button id="btn-wiz-refresh" class="btn btn-small btn-secondary">Refresh</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-wiz-close" class="btn btn-secondary">Close</button>
       </div>
     </div>
   </div>

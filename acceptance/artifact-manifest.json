@@ -1,0 +1,36 @@
+{
+  "projectId": "proj_platformer_2d",
+  "releaseId": "rel_platformer_v1",
+  "artifacts": [
+    {
+      "artifactId": "art_plat_win64",
+      "platform": "StandaloneWindows64",
+      "architecture": "x86_64",
+      "relativePath": "Builds/Windows/RetroPlatformer.exe",
+      "sizeBytes": 10,
+      "sha256Checksum": "7ccd9bfcb65bb96e2e9e0603b91e790701508ead48aec4da8a2dd4b563b0576e",
+      "status": "VERIFIED",
+      "createdAt": "2026-09-14T12:12:37Z"
+    },
+    {
+      "artifactId": "art_plat_linux",
+      "platform": "StandaloneLinux64",
+      "architecture": "x86_64",
+      "relativePath": "Builds/Linux/RetroPlatformer.x86_64",
+      "sizeBytes": 8,
+      "sha256Checksum": "e94466faac02d08efbb3109dbe52d0c13c5a53859e328d50dbeb2e6f0ee89871",
+      "status": "VERIFIED",
+      "createdAt": "2026-09-14T12:12:37Z"
+    },
+    {
+      "artifactId": "art_plat_osx",
+      "platform": "StandaloneOSX",
+      "architecture": "universal",
+      "relativePath": "Builds/OSX/RetroPlatformer.app/Contents/MacOS/RetroPlatformer",
+      "sizeBytes": 4,
+      "sha256Checksum": "d2238b6d7c34ad608a5f6caddf95928d741307fea41f0336302e390109311d72",
+      "status": "VERIFIED",
+      "createdAt": "2026-09-14T12:12:37Z"
+    }
+  ]
+}

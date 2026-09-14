@@ -2012,3 +2012,76 @@ textarea#user-prompt {
   align-items: center;
 }
 
+/* First-Run Setup Wizard */
+.wizard-modal-card {
+  max-width: 800px;
+  width: 90%;
+}
+
+.wizard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.wizard-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.wizard-card h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wizard-check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wizard-check-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.wizard-check-item.ok {
+  color: #7ee787;
+}
+
+.wizard-check-item.fail {
+  color: #f85149;
+}
+
+.wizard-status-banner {
+  padding: 14px 18px;
+  border-radius: 8px;
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wizard-status-banner.ready {
+  background: rgba(63, 185, 80, 0.15);
+  border: 1px solid rgba(63, 185, 80, 0.4);
+  color: #7ee787;
+}
+
+.wizard-status-banner.not-ready {
+  background: rgba(218, 54, 51, 0.15);
+  border: 1px solid rgba(218, 54, 51, 0.4);
+  color: #f85149;
+}
+

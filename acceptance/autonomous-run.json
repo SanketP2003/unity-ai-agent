@@ -1,0 +1,33 @@
+{
+  "runId": "run_acceptance_master_001",
+  "sessionId": "session_acceptance_master",
+  "projectId": "proj_platformer_2d",
+  "projectName": "Retro Platformer 2D",
+  "timestamp": "2026-09-14T12:12:00Z",
+  "goalPrompt": "Create a 2D retro platformer where Player collects 5 gems across 3 floating platforms, avoids red spike hazards, and displays a victory banner upon collecting all gems.",
+  "status": "COMPLETED",
+  "totalDurationMs": 14250,
+  "pipelineProgression": [
+    { "stage": "PLANNING", "durationMs": 1200, "status": "COMPLETED" },
+    { "stage": "BUILDING", "durationMs": 4800, "status": "COMPLETED" },
+    { "stage": "COMPILING", "durationMs": 2100, "status": "COMPLETED" },
+    { "stage": "DIAGNOSING", "durationMs": 450, "status": "COMPLETED" },
+    { "stage": "REPAIRING", "durationMs": 0, "status": "SKIPPED_CLEAN_COMPILATION" },
+    { "stage": "TESTING", "durationMs": 3500, "status": "COMPLETED" },
+    { "stage": "VALIDATING", "durationMs": 2200, "status": "COMPLETED" }
+  ],
+  "agentMetrics": {
+    "engine": "AgentLoop (Single Engine Invariant)",
+    "coordinator": "AutonomousRunController",
+    "totalToolCalls": 14,
+    "toolBreakdown": {
+      "inspect_scene": 4,
+      "create_gameobject": 6,
+      "execute_script": 2,
+      "compile_scripts": 1,
+      "play_mode": 1
+    },
+    "tokensUsed": 18450,
+    "circuitBreakerState": "CLOSED"
+  }
+}

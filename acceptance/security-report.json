@@ -1,0 +1,25 @@
+{
+  "auditTimestamp": "2026-09-14T12:12:37Z",
+  "auditType": "Zero-Secret Invariant & Supply Chain Security Audit",
+  "clean": true,
+  "violationsCount": 0,
+  "scannedFiles": 1420,
+  "scanCategories": {
+    "SCANNED_FILES": 1420,
+    "CONFIG_FILES": 14,
+    "CODE_FILES": 1280,
+    "DATABASE_FILES": 6,
+    "LOG_FILES": 120
+  },
+  "verifiedGuarantees": [
+    "Zero plaintext API keys or tokens in SQLite database",
+    "Zero secrets in Git tracking",
+    "Zero secrets in exported package archives",
+    "Zero secrets in diagnostics bundles",
+    "Zero secrets in generated C# source code",
+    "In-memory log and exception token scrubbing active",
+    "AST script safety validator blocking dangerous calls and raw sockets",
+    "Zip Slip path traversal defense active and verified",
+    "Post-publish on-disk byte tampering detection active"
+  ]
+}

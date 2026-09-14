@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "productName": "Autonomous Game Studio",
+  "version": "1.0.0",
+  "releaseTag": "v1.0.0",
+  "releaseDate": "2026-09-14T12:00:00Z",
+  "architecture": "Single-Agent Autonomous Engine (AgentLoop) with Authoritative CompletionGate",
+  "distributionType": "Production Release",
+  "components": [
+    {
+      "id": "backend-core",
+      "name": "Autonomous Game Studio Backend",
+      "version": "1.0.0",
+      "runtime": "Java 21 LTS",
+      "framework": "Spring Boot 3.3.5",
+      "database": "SQLite 3.45.3 (WAL Mode)",
+      "artifact": "autonomous-unity-agent-0.1.0.jar",
+      "entrypoint": "com.unityagent.AutonomousUnityAgentApplication"
+    },
+    {
+      "id": "unity-extension",
+      "name": "Autonomous Unity Agent Extension",
+      "version": "1.0.0",
+      "packageId": "com.unityagent.autonomous-ai-agent",
+      "targetUnity": "2022.3 LTS / 2023.2 LTS / 6000.0+",
+      "protocol": "WebSocket JSON-RPC 2.0 (ws://localhost:8080/ws/unity)"
+    },
+    {
+      "id": "web-studio",
+      "name": "Web Studio Client UI",
+      "version": "1.0.0",
+      "type": "SPA (Single Page Application)",
+      "assets": ["index.html", "style.css", "app.js"]
+    }
+  ],
+  "supportedPlatforms": [
+    "windows_x86_64",
+    "osx_universal",
+    "linux_x86_64"
+  ],
+  "securityAttestation": {
+    "zeroSecretPolicy": "ENFORCED",
+    "astSafetyValidation": "ENABLED",
+    "immutablePublishing": "ENFORCED",
+    "tamperDetection": "SHA-256 Verified",
+    "humanApprovalGate": "REQUIRED (ADMIN/REVIEWER)"
+  }
+}

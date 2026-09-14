@@ -127,7 +127,7 @@ public class ReleaseManager {
      * Only human leads with REVIEWER, ADMIN, or OWNER role can approve.
      */
     public Release approveRelease(String releaseId, String reviewerRole, String reviewerId, String notes) {
-        if (reviewerId == null || reviewerId.equalsIgnoreCase("agent") || reviewerId.equalsIgnoreCase("llm")
+        if (reviewerId == null || reviewerId.toLowerCase().contains("agent") || reviewerId.toLowerCase().contains("llm")
                 || reviewerId.toLowerCase().contains("autonomous")) {
             throw new SecurityException("Security boundary violation: Automated agents and LLMs are strictly forbidden from approving releases.");
         }
@@ -260,6 +260,28 @@ public class ReleaseManager {
             log.info("Release {} rolled back for project {}", releaseId, projectId);
         } catch (Exception e) {
             throw new RuntimeException("Rollback failed: " + e.getMessage(), e);
+        }
+
+        return release;
+    }
+
+    public Release archiveRelease(String releaseId, String projectId) {
+        Release release = getRelease(releaseId)
+                .orElseThrow(() -> new IllegalArgumentException("Release not found: " + releaseId));
+
+        if (!release.getProjectId().equals(projectId)) {
+            throw new SecurityException("Cross-project archive attempt rejected");
+        }
+
+        String sql = "UPDATE game_releases SET status = 'ARCHIVED' WHERE release_id = ?";
+        try (Connection conn = memoryDb.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, releaseId);
+            ps.executeUpdate();
+            release.setStatus(ReleaseStatus.ARCHIVED);
+            log.info("Release {} archived for project {}", releaseId, projectId);
+        } catch (Exception e) {
+            throw new RuntimeException("Archive failed: " + e.getMessage(), e);
         }
 
         return release;

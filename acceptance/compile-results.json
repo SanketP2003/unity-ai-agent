@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-09-14T12:12:08.200Z",
+  "compiler": "Unity Roslyn C# Compiler (csc)",
+  "languageVersion": "C# 9.0",
+  "unityTarget": "2022.3.20f1",
+  "errorCount": 0,
+  "warningCount": 0,
+  "compiledAssemblies": [
+    "Assembly-CSharp.dll"
+  ],
+  "compiledScripts": [
+    "Assets/Scripts/PlayerController2D.cs"
+  ],
+  "diagnostics": [],
+  "compilationTimeMs": 2100,
+  "domainReloadTimeMs": 1450,
+  "status": "SUCCESS"
+}

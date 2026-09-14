@@ -48,6 +48,33 @@
   const cfgKeyStatus = document.getElementById('cfg-key-status');
   const cfgFeedback = document.getElementById('cfg-feedback');
 
+  // DOM Elements - Wizard Modal
+  const btnOpenWizard = document.getElementById('btn-open-wizard');
+  const btnCloseWizard = document.getElementById('btn-close-wizard');
+  const btnWizClose = document.getElementById('btn-wiz-close');
+  const btnWizTestProv = document.getElementById('btn-wiz-test-prov');
+  const btnWizRunAudit = document.getElementById('btn-wiz-run-audit');
+  const btnWizRefresh = document.getElementById('btn-wiz-refresh');
+  const wizardModal = document.getElementById('wizard-modal');
+  const wizSysBadge = document.getElementById('wiz-sys-badge');
+  const wizJava = document.getElementById('wiz-java');
+  const wizMemory = document.getElementById('wiz-memory');
+  const wizDisk = document.getElementById('wiz-disk');
+  const wizWrite = document.getElementById('wiz-write');
+  const wizSqlite = document.getElementById('wiz-sqlite');
+  const wizProvBadge = document.getElementById('wiz-prov-badge');
+  const wizProviderSelect = document.getElementById('wiz-provider-select');
+  const wizApiKey = document.getElementById('wiz-api-key');
+  const wizProvFeedback = document.getElementById('wiz-prov-feedback');
+  const wizUnityBadge = document.getElementById('wiz-unity-badge');
+  const wizUnityState = document.getElementById('wiz-unity-state');
+  const wizUnityProjects = document.getElementById('wiz-unity-projects');
+  const wizSecBadge = document.getElementById('wiz-sec-badge');
+  const wizSecFeedback = document.getElementById('wiz-sec-feedback');
+  const wizReadinessBanner = document.getElementById('wiz-readiness-banner');
+  const wizReadinessTitle = document.getElementById('wiz-readiness-title');
+  const wizReadinessDesc = document.getElementById('wiz-readiness-desc');
+
   // State
   let currentSessionId = localStorage.getItem('active_unity_session') || 'session_001';
   sessionInput.value = currentSessionId;
@@ -132,6 +159,26 @@
     }
     if (cfgProvider) {
       cfgProvider.addEventListener('change', handleProviderChange);
+    }
+
+    // Wizard modal triggers
+    if (btnOpenWizard) {
+      btnOpenWizard.addEventListener('click', openWizardModal);
+    }
+    if (btnCloseWizard) {
+      btnCloseWizard.addEventListener('click', closeWizardModal);
+    }
+    if (btnWizClose) {
+      btnWizClose.addEventListener('click', closeWizardModal);
+    }
+    if (btnWizRefresh) {
+      btnWizRefresh.addEventListener('click', refreshWizardStatus);
+    }
+    if (btnWizTestProv) {
+      btnWizTestProv.addEventListener('click', handleWizardTestProvider);
+    }
+    if (btnWizRunAudit) {
+      btnWizRunAudit.addEventListener('click', handleWizardRunSecurityAudit);
     }
   }
 
@@ -2444,6 +2491,143 @@
       alert(`Diagnostics bundle successfully exported to: ${data.bundlePath}`);
     } catch (e) {
       alert('Export failed: ' + e.message);
+    }
+  }
+
+  // --- Wizard Modal Logic ---
+
+  async function openWizardModal() {
+    if (!wizardModal) return;
+    wizardModal.classList.remove('hidden');
+    if (wizProvFeedback) wizProvFeedback.classList.add('hidden');
+    if (wizSecFeedback) wizSecFeedback.classList.add('hidden');
+    if (wizApiKey) wizApiKey.value = '';
+    await refreshWizardStatus();
+  }
+
+  function closeWizardModal() {
+    if (!wizardModal) return;
+    wizardModal.classList.add('hidden');
+  }
+
+  async function refreshWizardStatus() {
+    try {
+      const res = await fetch('/api/product/setup-status');
+      if (!res.ok) throw new Error('Failed to load setup status');
+      const status = await res.json();
+
+      // 1. System Requirements
+      if (status.systemCheck) {
+        const sc = status.systemCheck;
+        if (wizSysBadge) {
+          wizSysBadge.textContent = sc.satisfied ? 'PASSED' : 'ACTION REQUIRED';
+          wizSysBadge.className = 'badge ' + (sc.satisfied ? 'badge-success' : 'badge-error');
+        }
+        if (wizJava) wizJava.textContent = `Java ${sc.javaVersion || 0} (${sc.javaVersion >= 21 ? 'OK' : 'Requires Java 21+'})`;
+        if (wizMemory) wizMemory.textContent = `${Math.round((sc.maxMemoryBytes || 0) / (1024 * 1024))} MB`;
+        if (wizDisk) wizDisk.textContent = `${Math.round((sc.freeDiskBytes || 0) / (1024 * 1024 * 1024))} GB`;
+        if (wizWrite) wizWrite.textContent = sc.filesystemWritable ? 'Writable' : 'Read-Only';
+        if (wizSqlite) wizSqlite.textContent = sc.sqliteSupported ? 'Available (JDBC)' : 'Unavailable';
+      }
+
+      // 2. AI Provider
+      if (wizProvBadge) {
+        wizProvBadge.textContent = status.providerState || 'UNCONFIGURED';
+        const isOk = status.providerState === 'VERIFIED' || status.providerState === 'CONFIGURED';
+        wizProvBadge.className = 'badge ' + (isOk ? 'badge-success' : 'badge-warning');
+      }
+
+      // 3. Unity Connection
+      if (wizUnityBadge) {
+        wizUnityBadge.textContent = status.unityState || 'NOT_CONNECTED';
+        const isConn = status.unityState === 'CONNECTED';
+        wizUnityBadge.className = 'badge ' + (isConn ? 'badge-success' : 'badge-error');
+      }
+      if (wizUnityState) wizUnityState.textContent = status.unityState || 'NOT_CONNECTED';
+      if (wizUnityProjects) wizUnityProjects.textContent = String(status.connectedProjectCount || 0);
+
+      // 4. Overall Readiness
+      const isReady = status.readinessState === 'READY_FOR_AUTONOMOUS_RUN';
+      if (wizReadinessBanner) {
+        wizReadinessBanner.className = 'wizard-status-banner ' + (isReady ? 'ready' : 'not-ready');
+      }
+      if (wizReadinessTitle) {
+        wizReadinessTitle.textContent = isReady ? 'Studio Status: READY FOR AUTONOMOUS RUN' : 'Studio Status: NOT READY';
+      }
+      if (wizReadinessDesc) {
+        if (isReady) {
+          wizReadinessDesc.textContent = 'All core prerequisites are satisfied. Ready to create and launch autonomous games.';
+        } else if (status.missingPrerequisites && status.missingPrerequisites.length > 0) {
+          wizReadinessDesc.textContent = 'Missing: ' + status.missingPrerequisites.join(', ');
+        } else {
+          wizReadinessDesc.textContent = 'Please configure missing requirements above.';
+        }
+      }
+    } catch (e) {
+      console.warn('Error refreshing setup status:', e);
+    }
+  }
+
+  async function handleWizardTestProvider() {
+    if (!wizProvFeedback) return;
+    wizProvFeedback.classList.remove('hidden', 'success', 'error');
+    wizProvFeedback.textContent = 'Testing connection...';
+
+    const providerName = wizProviderSelect ? wizProviderSelect.value : 'nvidia';
+    const apiKeyOverride = wizApiKey ? wizApiKey.value.trim() : '';
+
+    try {
+      const res = await fetch('/api/product/test-provider', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerName: providerName,
+          apiKeyOverride: apiKeyOverride || null
+        })
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        wizProvFeedback.className = 'settings-feedback success';
+        wizProvFeedback.textContent = `Success (${result.latencyMs}ms): ${result.message}`;
+        await refreshWizardStatus();
+      } else {
+        wizProvFeedback.className = 'settings-feedback error';
+        wizProvFeedback.textContent = `Connection failed (${result.statusCode}): ${result.message}`;
+      }
+    } catch (e) {
+      wizProvFeedback.className = 'settings-feedback error';
+      wizProvFeedback.textContent = 'Error testing provider: ' + e.message;
+    }
+  }
+
+  async function handleWizardRunSecurityAudit() {
+    if (!wizSecFeedback) return;
+    wizSecFeedback.classList.remove('hidden', 'success', 'error');
+    wizSecFeedback.textContent = 'Scanning for credentials and plaintext secrets...';
+
+    try {
+      const res = await fetch('/api/product/security-audit');
+      const audit = await res.json();
+
+      if (audit.clean) {
+        wizSecFeedback.className = 'settings-feedback success';
+        wizSecFeedback.textContent = `Audit Clean! Scanned ${audit.scannedFiles} files in ${audit.durationMs}ms. Zero secret leaks detected.`;
+        if (wizSecBadge) {
+          wizSecBadge.textContent = 'Clean';
+          wizSecBadge.className = 'badge badge-success';
+        }
+      } else {
+        wizSecFeedback.className = 'settings-feedback error';
+        wizSecFeedback.textContent = `Violations detected (${audit.violations?.length || 0}): ` + (audit.violations || []).join('; ');
+        if (wizSecBadge) {
+          wizSecBadge.textContent = 'Violations';
+          wizSecBadge.className = 'badge badge-error';
+        }
+      }
+    } catch (e) {
+      wizSecFeedback.className = 'settings-feedback error';
+      wizSecFeedback.textContent = 'Audit request failed: ' + e.message;
     }
   }
 

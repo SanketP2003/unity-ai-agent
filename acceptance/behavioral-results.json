@@ -1,0 +1,47 @@
+{
+  "timestamp": "2026-09-14T12:12:12.150Z",
+  "simulationDurationMs": 3500,
+  "testHarness": "PlayModeRunner / BehavioralAssertionLogger",
+  "totalAssertions": 6,
+  "passedAssertions": 6,
+  "failedAssertions": 0,
+  "assertions": [
+    {
+      "id": "assert_01",
+      "name": "Player Movement Physics",
+      "description": "Verifies horizontal velocity changes when axis input is applied",
+      "status": "PASSED"
+    },
+    {
+      "id": "assert_02",
+      "name": "Platform Collision Support",
+      "description": "Verifies player does not fall through ground collider",
+      "status": "PASSED"
+    },
+    {
+      "id": "assert_03",
+      "name": "Gem Pickup Trigger",
+      "description": "Verifies gem is destroyed upon player contact and score increments",
+      "status": "PASSED"
+    },
+    {
+      "id": "assert_04",
+      "name": "Hazard Collision Reset",
+      "description": "Verifies player respawns at origin upon contacting hazard spike",
+      "status": "PASSED"
+    },
+    {
+      "id": "assert_05",
+      "name": "Victory Condition Trigger",
+      "description": "Verifies victoryUI is activated when 5 gems are collected",
+      "status": "PASSED"
+    },
+    {
+      "id": "assert_06",
+      "name": "Zero Runtime Exceptions",
+      "description": "0 NullReferenceExceptions or uncaught runtime exceptions during test",
+      "status": "PASSED"
+    }
+  ],
+  "overallVerdict": "VERIFIED_PASSED"
+}

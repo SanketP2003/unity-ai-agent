@@ -55,15 +55,29 @@ public class ScriptSafetyValidator {
             Pattern.compile("\\bAssembly\\.Load(From|File)?\\b"),
             Pattern.compile("\\bAppDomain\\.CurrentDomain\\.Load\\b"),
 
+            // Reflection abuse & dynamic invocation
+            Pattern.compile("\\b(MethodInfo|PropertyInfo|FieldInfo)\\.Invoke\\b"),
+            Pattern.compile("\\bActivator\\.CreateInstance\\b"),
+            Pattern.compile("\\bType\\.GetType\\s*\\("),
+
             // Environment & registry manipulation
             Pattern.compile("\\bSystem\\.Environment\\b"),
             Pattern.compile("\\bEnvironment\\.(Exit|FailFast|SetEnvironmentVariable|GetEnvironmentVariable)\\b"),
             Pattern.compile("\\bMicrosoft\\.Win32\\b"),
             Pattern.compile("\\bRegistry(Key)?\\b"),
 
-            // Raw sockets & unrestricted low-level networking
+            // Destructive file & directory manipulation
+            Pattern.compile("\\b(File|Directory)\\.(Delete|Move)\\b"),
+
+            // Raw sockets & unrestricted networking
             Pattern.compile("\\bSystem\\.Net\\.Sockets\\b"),
-            Pattern.compile("\\b(Socket|TcpClient|TcpListener|UdpClient)\\b")
+            Pattern.compile("\\b(Socket|TcpClient|TcpListener|UdpClient)\\b"),
+            Pattern.compile("\\b(WebClient|HttpWebRequest|HttpClient)\\b"),
+
+            // Unsafe unmanaged code & memory manipulation
+            Pattern.compile("\\bunsafe\\s*\\{"),
+            Pattern.compile("\\bstackalloc\\b"),
+            Pattern.compile("\\bMarshal\\.(AllocHGlobal|Copy|PtrToStructure|StructureToPtr)\\b")
     );
 
     /**

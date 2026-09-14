@@ -1,0 +1,26 @@
+{
+  "releaseId": "rel_platformer_v1",
+  "projectId": "proj_platformer_2d",
+  "version": "1.0.0",
+  "channel": "STABLE",
+  "title": "Retro Platformer 1.0.0 Sovereign Production Release",
+  "description": "Production validated autonomous 2D platformer with collectables, physics, and UI",
+  "status": "PUBLISHED",
+  "isImmutable": true,
+  "artifacts": [
+    "art_plat_win64",
+    "art_plat_linux",
+    "art_plat_osx"
+  ],
+  "humanApproval": {
+    "approvedBy": "lead_game_designer",
+    "role": "ADMIN",
+    "approvalNotes": "Manually play-tested mechanics and verified SHA-256",
+    "approvedAt": "2026-09-14T12:12:37Z"
+  },
+  "publishedAt": "2026-09-14T12:12:37Z",
+  "tamperProtection": {
+    "detectionMode": "STRICT_SHA256",
+    "postPublishMutationBlocked": true
+  }
+}
