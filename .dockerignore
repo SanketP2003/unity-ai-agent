@@ -1,0 +1,7 @@
+**/target/
+*.log
+.idea/
+.git/
+unity-agent-extension/
+unity/
+distribution/
