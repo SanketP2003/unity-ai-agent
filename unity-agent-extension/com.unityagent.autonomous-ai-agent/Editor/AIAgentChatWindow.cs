@@ -29,7 +29,7 @@ namespace AutonomousUnityAgent.Editor
             };
         }
 
-        private const string DefaultServerUrl = "http://localhost:8080";
+        private const string DefaultServerUrl = "https://unity-ai-backend-z2a5.onrender.com";
         private const string SessionPrefKey = "AutonomousAgent_SessionId";
 
         // State
@@ -96,6 +96,12 @@ namespace AutonomousUnityAgent.Editor
 
         private void OnEnable()
         {
+            _serverUrl = EditorPrefs.GetString("AutonomousAgent_RuntimeUrl", DefaultServerUrl);
+            if (string.IsNullOrEmpty(_serverUrl) || _serverUrl.Contains("localhost:8080"))
+            {
+                _serverUrl = DefaultServerUrl;
+                EditorPrefs.SetString("AutonomousAgent_RuntimeUrl", _serverUrl);
+            }
             _sessionId = EditorPrefs.GetString(SessionPrefKey, "session_001");
             EditorApplication.update += OnEditorUpdate;
             AgentBridge.ShowWindow();

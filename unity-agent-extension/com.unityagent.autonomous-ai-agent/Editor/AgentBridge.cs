@@ -21,7 +21,7 @@ namespace AutonomousUnityAgent.Editor
     public class AgentBridge : EditorWindow
     {
         public const string PrefWsUrl = "AutonomousAgent_WsUrl";
-        private const string DefaultWsUrl = "ws://localhost:8080/unity-bridge";
+        private const string DefaultWsUrl = "wss://unity-ai-backend-z2a5.onrender.com/unity-bridge";
 
         [InitializeOnLoadMethod]
         private static void AutoStartBridge()
@@ -69,6 +69,11 @@ namespace AutonomousUnityAgent.Editor
         {
             Application.runInBackground = true;
             _serverUrl = EditorPrefs.GetString(PrefWsUrl, DefaultWsUrl);
+            if (string.IsNullOrEmpty(_serverUrl) || _serverUrl.Contains("localhost:8080"))
+            {
+                _serverUrl = DefaultWsUrl;
+                EditorPrefs.SetString(PrefWsUrl, _serverUrl);
+            }
             // Initialize persistent project identity
             var identity = ProjectIdentity.GetOrCreateIdentity();
             _projectId = identity.projectId;
@@ -533,7 +538,7 @@ namespace AutonomousUnityAgent.Editor
         {
             EditorGUILayout.LabelField("Info", EditorStyles.boldLabel);
 
-            EditorGUILayout.LabelField("Backend:", $"localhost:{_serverPort}");
+            EditorGUILayout.LabelField("Backend:", _serverUrl);
             EditorGUILayout.LabelField("Protocol:", "1.0");
             EditorGUILayout.LabelField("Unity:", Application.unityVersion);
             EditorGUILayout.LabelField("Project Name:", ProjectIdentity.GetProjectName());

@@ -21,7 +21,7 @@ namespace AutonomousUnityAgent.Editor
         private const string PrefBaseUrl = "AutonomousAgent_BaseUrl";
         private const string PrefModel = "AutonomousAgent_Model";
 
-        private string _runtimeUrl = "http://localhost:8080";
+        private string _runtimeUrl = "https://unity-ai-backend-z2a5.onrender.com";
         private int _providerIndex = 0;
         private readonly string[] _providerOptions = new[] { "openai-compatible", "openai" };
         private string _baseUrl = "https://integrate.api.nvidia.com/v1";
@@ -43,7 +43,12 @@ namespace AutonomousUnityAgent.Editor
 
         private void OnEnable()
         {
-            _runtimeUrl = EditorPrefs.GetString(PrefRuntimeUrl, "http://localhost:8080");
+            _runtimeUrl = EditorPrefs.GetString(PrefRuntimeUrl, "https://unity-ai-backend-z2a5.onrender.com");
+            if (string.IsNullOrEmpty(_runtimeUrl) || _runtimeUrl.Contains("localhost:8080"))
+            {
+                _runtimeUrl = "https://unity-ai-backend-z2a5.onrender.com";
+                EditorPrefs.SetString(PrefRuntimeUrl, _runtimeUrl);
+            }
             string savedProvider = EditorPrefs.GetString(PrefProvider, "openai-compatible");
             _providerIndex = Array.IndexOf(_providerOptions, savedProvider);
             if (_providerIndex < 0) _providerIndex = 0;

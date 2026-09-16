@@ -1,6 +1,6 @@
 # SHA-256 Checksums for Autonomous Game Studio 1.0.0 Distribution Manifests
-37fe74bf3485d5a5639ef5e1a8c83a87ea74f3c7ad073aa2d521de21127be800  release-manifest.json
+93285f13b5b6903521be18e2e86d4452ac73256b2380ecfedcb601a616582573  release-manifest.json
 bb45647a9991f3ff4d5173846bd4fd346667af4c2a7597b021190a2de4871f2b  dependency-manifest.json
 b4a0789e3459b732092e6dd73e445ad6795f8a628fe32f295e93f03a6a852ad9  security-report.json
-208e86b3452d5dba1bcb50beac9079000476aa715292c0d2fdc89d0ea20f5c70  com.unityagent.autonomous-ai-agent-1.0.0.tgz
-ed703c1bb357424f6d06f96fdebeb9cdfdf42e44f0719861a6a6af80c02495d4  autonomous-ai-agent-extension-v1.0.0.zip
+d23009a07eae8368b298d24a9ad736a243ad275689b164487c75cc2e53acffce  com.unityagent.autonomous-ai-agent-1.0.0.tgz
+4adb0165b52b606f33b367728d38b0fb9f5a177dd1e77def321c7a5f44f3e26c  autonomous-ai-agent-extension-v1.0.0.zip
