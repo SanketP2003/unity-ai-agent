@@ -219,24 +219,35 @@ public class AgentController {
      */
     @GetMapping("/config/provider")
     public ResponseEntity<Map<String, Object>> getProviderConfig() {
-        if (aiProviderFactory != null) {
-            return ResponseEntity.ok(aiProviderFactory.getCurrentProviderInfo());
+        try {
+            if (aiProviderFactory != null) {
+                return ResponseEntity.ok(aiProviderFactory.getCurrentProviderInfo());
+            }
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("provider", aiProvider != null ? aiProvider.getProviderName() : "openai-compatible");
+            resp.put("configured", aiProvider != null && aiProvider.isConfigured());
+            resp.put("capabilities", aiProvider != null ? aiProvider.getCapabilities() : com.unityagent.agent.provider.ProviderCapabilities.compatibleDefault());
+            if (aiProvider instanceof com.unityagent.agent.provider.openai.OpenAICompatibleProvider oacp) {
+                resp.put("model", oacp.getModel());
+                resp.put("baseUrl", oacp.getBaseUrl());
+            } else if (aiProvider instanceof com.unityagent.agent.provider.openai.OpenAIProvider op) {
+                resp.put("model", op.getModel());
+                resp.put("baseUrl", op.getBaseUrl());
+            }
+            resp.put("hasApiKey", aiProvider != null && aiProvider.isConfigured());
+            resp.put("apiKeyConfigured", aiProvider != null && aiProvider.isConfigured());
+            resp.put("maskedApiKey", (aiProvider != null && aiProvider.isConfigured()) ? "••••••••" : "");
+            return ResponseEntity.ok(resp);
+        } catch (Exception ex) {
+            log.error("Failed to get provider config: {}", ex.getMessage(), ex);
+            Map<String, Object> fallback = new LinkedHashMap<>();
+            fallback.put("provider", "openai-compatible");
+            fallback.put("configured", false);
+            fallback.put("hasApiKey", false);
+            fallback.put("maskedApiKey", "");
+            fallback.put("capabilities", com.unityagent.agent.provider.ProviderCapabilities.compatibleDefault());
+            return ResponseEntity.ok(fallback);
         }
-        Map<String, Object> resp = new LinkedHashMap<>();
-        resp.put("provider", aiProvider.getProviderName());
-        resp.put("configured", aiProvider.isConfigured());
-        resp.put("capabilities", aiProvider.getCapabilities());
-        if (aiProvider instanceof com.unityagent.agent.provider.openai.OpenAICompatibleProvider oacp) {
-            resp.put("model", oacp.getModel());
-            resp.put("baseUrl", oacp.getBaseUrl());
-        } else if (aiProvider instanceof com.unityagent.agent.provider.openai.OpenAIProvider op) {
-            resp.put("model", op.getModel());
-            resp.put("baseUrl", op.getBaseUrl());
-        }
-        resp.put("hasApiKey", aiProvider.isConfigured());
-        resp.put("apiKeyConfigured", aiProvider.isConfigured());
-        resp.put("maskedApiKey", aiProvider.isConfigured() ? "••••••••" : "");
-        return ResponseEntity.ok(resp);
     }
 
     /**
@@ -245,41 +256,57 @@ public class AgentController {
      */
     @PostMapping("/config/provider")
     public ResponseEntity<Map<String, Object>> updateProviderConfig(@RequestBody Map<String, Object> body) {
-        String provider = (String) body.getOrDefault("provider", aiProvider.getProviderName());
-        String baseUrl = (String) body.get("baseUrl");
-        String apiKey = (String) body.get("apiKey");
-        String model = (String) body.get("model");
+        try {
+            String provider = (String) body.get("provider");
+            if (provider == null || provider.isBlank()) {
+                try {
+                    provider = aiProvider != null ? aiProvider.getProviderName() : "openai-compatible";
+                } catch (Exception ignored) {
+                    provider = "openai-compatible";
+                }
+            }
+            String baseUrl = (String) body.get("baseUrl");
+            String apiKey = (String) body.get("apiKey");
+            String model = (String) body.get("model");
 
-        com.unityagent.agent.provider.ProviderCapabilities capabilities = null;
-        if (body.containsKey("capabilities") && body.get("capabilities") instanceof Map<?, ?> capMap) {
-            boolean toolCalling = capMap.containsKey("toolCalling") ? Boolean.TRUE.equals(capMap.get("toolCalling")) : true;
-            boolean structured = capMap.containsKey("structuredOutput") ? Boolean.TRUE.equals(capMap.get("structuredOutput")) : false;
-            boolean streaming = capMap.containsKey("streaming") ? Boolean.TRUE.equals(capMap.get("streaming")) : true;
-            boolean vision = capMap.containsKey("vision") ? Boolean.TRUE.equals(capMap.get("vision")) : false;
-            capabilities = new com.unityagent.agent.provider.ProviderCapabilities(toolCalling, structured, streaming, vision);
-        }
+            com.unityagent.agent.provider.ProviderCapabilities capabilities = null;
+            if (body.containsKey("capabilities") && body.get("capabilities") instanceof Map<?, ?> capMap) {
+                boolean toolCalling = capMap.containsKey("toolCalling") ? Boolean.TRUE.equals(capMap.get("toolCalling")) : true;
+                boolean structured = capMap.containsKey("structuredOutput") ? Boolean.TRUE.equals(capMap.get("structuredOutput")) : false;
+                boolean streaming = capMap.containsKey("streaming") ? Boolean.TRUE.equals(capMap.get("streaming")) : true;
+                boolean vision = capMap.containsKey("vision") ? Boolean.TRUE.equals(capMap.get("vision")) : false;
+                capabilities = new com.unityagent.agent.provider.ProviderCapabilities(toolCalling, structured, streaming, vision);
+            }
 
-        if (aiProviderFactory != null) {
-            aiProviderFactory.configureProvider(provider, baseUrl, apiKey, model, capabilities);
-            return ResponseEntity.ok(aiProviderFactory.getCurrentProviderInfo());
-        }
+            if (aiProviderFactory != null) {
+                aiProviderFactory.configureProvider(provider, baseUrl, apiKey, model, capabilities);
+                return ResponseEntity.ok(aiProviderFactory.getCurrentProviderInfo());
+            }
 
-        Map<String, Object> resp = new LinkedHashMap<>();
-        resp.put("status", "SUCCESS");
-        resp.put("provider", aiProvider.getProviderName());
-        resp.put("configured", aiProvider.isConfigured());
-        resp.put("capabilities", aiProvider.getCapabilities());
-        if (aiProvider instanceof com.unityagent.agent.provider.openai.OpenAICompatibleProvider oacp) {
-            resp.put("model", oacp.getModel());
-            resp.put("baseUrl", oacp.getBaseUrl());
-        } else if (aiProvider instanceof com.unityagent.agent.provider.openai.OpenAIProvider op) {
-            resp.put("model", op.getModel());
-            resp.put("baseUrl", op.getBaseUrl());
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("status", "SUCCESS");
+            resp.put("provider", provider);
+            resp.put("configured", aiProvider != null && aiProvider.isConfigured());
+            resp.put("capabilities", aiProvider != null ? aiProvider.getCapabilities() : com.unityagent.agent.provider.ProviderCapabilities.compatibleDefault());
+            if (aiProvider instanceof com.unityagent.agent.provider.openai.OpenAICompatibleProvider oacp) {
+                resp.put("model", oacp.getModel());
+                resp.put("baseUrl", oacp.getBaseUrl());
+            } else if (aiProvider instanceof com.unityagent.agent.provider.openai.OpenAIProvider op) {
+                resp.put("model", op.getModel());
+                resp.put("baseUrl", op.getBaseUrl());
+            }
+            resp.put("hasApiKey", aiProvider != null && aiProvider.isConfigured());
+            resp.put("apiKeyConfigured", aiProvider != null && aiProvider.isConfigured());
+            resp.put("maskedApiKey", (aiProvider != null && aiProvider.isConfigured()) ? "••••••••" : "");
+            return ResponseEntity.ok(resp);
+        } catch (Exception ex) {
+            log.error("Failed to update provider config: {}", ex.getMessage(), ex);
+            Map<String, Object> err = new LinkedHashMap<>();
+            err.put("status", "ERROR");
+            err.put("error", ex.getClass().getSimpleName());
+            err.put("message", ex.getMessage() != null ? ex.getMessage() : "Failed to update provider configuration");
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).body(err);
         }
-        resp.put("hasApiKey", aiProvider.isConfigured());
-        resp.put("apiKeyConfigured", aiProvider.isConfigured());
-        resp.put("maskedApiKey", aiProvider.isConfigured() ? "••••••••" : "");
-        return ResponseEntity.ok(resp);
     }
 
     /**

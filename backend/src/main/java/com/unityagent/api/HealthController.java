@@ -25,6 +25,8 @@ import java.util.Map;
 @RequestMapping("/api")
 public class HealthController {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(HealthController.class);
+
     private final MemoryDatabase db;
     private final UnityConnection unityConnection;
     private final AIProvider aiProvider;
@@ -64,20 +66,30 @@ public class HealthController {
         ));
 
         // 4. Provider: distinct configured vs available
-        boolean configured = aiProvider != null && aiProvider.isConfigured();
-        boolean available = configured;
+        boolean configured = false;
+        String providerName = "none";
         String breakerState = "CLOSED";
-        if (aiProvider instanceof OpenAICompatibleProvider oacp) {
-            breakerState = oacp.getCircuitBreaker().getState().name();
-            if (oacp.getCircuitBreaker().getState() == CircuitBreaker.State.OPEN) {
-                available = false;
+        boolean available = false;
+        try {
+            if (aiProvider != null) {
+                configured = aiProvider.isConfigured();
+                available = configured;
+                providerName = aiProvider.getProviderName();
+                if (aiProvider instanceof OpenAICompatibleProvider oacp) {
+                    breakerState = oacp.getCircuitBreaker().getState().name();
+                    if (oacp.getCircuitBreaker().getState() == CircuitBreaker.State.OPEN) {
+                        available = false;
+                    }
+                }
             }
+        } catch (Exception ex) {
+            log.warn("Health check provider inspection: {}", ex.getMessage());
         }
         components.put("provider", Map.of(
                 "configured", configured,
                 "available", available,
                 "circuitBreaker", breakerState,
-                "providerName", aiProvider != null ? aiProvider.getProviderName() : "none"
+                "providerName", providerName
         ));
 
         boolean overallUp = dbHealthy;

@@ -28,12 +28,24 @@ public class AIProviderFactory {
             @Value("${agent.ai.provider:openai-compatible}") String configuredProvider,
             OpenAIProvider openAIProvider,
             OpenAICompatibleProvider openAICompatibleProvider) {
-        this.activeProviderName = configuredProvider != null ? configuredProvider.trim().toLowerCase() : "openai-compatible";
-
         registerProvider("openai", openAIProvider);
         registerProvider("openai-compatible", openAICompatibleProvider);
         registerProvider("openaicompatible", openAICompatibleProvider);
         registerProvider("compatible", openAICompatibleProvider);
+        registerProvider("nvidia", openAICompatibleProvider);
+        registerProvider("nvidia-nim", openAICompatibleProvider);
+        registerProvider("nim", openAICompatibleProvider);
+        registerProvider("ollama", openAICompatibleProvider);
+        registerProvider("vllm", openAICompatibleProvider);
+        registerProvider("lmstudio", openAICompatibleProvider);
+        registerProvider("lm-studio", openAICompatibleProvider);
+        registerProvider("groq", openAICompatibleProvider);
+        registerProvider("together", openAICompatibleProvider);
+        registerProvider("openrouter", openAICompatibleProvider);
+        registerProvider("custom", openAICompatibleProvider);
+
+        String normalized = configuredProvider != null ? configuredProvider.trim().toLowerCase() : "openai-compatible";
+        this.activeProviderName = providers.containsKey(normalized) ? normalized : "openai-compatible";
 
         log.info("AIProviderFactory initialized. Active provider: '{}'", this.activeProviderName);
     }
@@ -100,7 +112,9 @@ public class AIProviderFactory {
         String key = providerName.trim().toLowerCase();
         AIProvider provider = providers.get(key);
         if (provider == null) {
-            throw new IllegalArgumentException("Cannot configure unknown provider: '" + providerName + "'");
+            log.warn("Unknown provider '{}' requested for dynamic configuration. Defaulting to openai-compatible.", providerName);
+            provider = providers.get("openai-compatible");
+            key = "openai-compatible";
         }
 
         if (provider instanceof OpenAICompatibleProvider oacp) {

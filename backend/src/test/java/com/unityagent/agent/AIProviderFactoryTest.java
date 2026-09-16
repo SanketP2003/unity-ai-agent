@@ -86,6 +86,21 @@ class AIProviderFactoryTest {
         assertTrue(factory.hasProvider("openai"));
         assertTrue(factory.hasProvider("openai-compatible"));
         assertTrue(factory.hasProvider("compatible"));
+        assertTrue(factory.hasProvider("nvidia"));
+        assertTrue(factory.hasProvider("ollama"));
         assertFalse(factory.hasProvider("anthropic"));
+    }
+
+    @Test
+    @DisplayName("Should select nvidia provider when configured via environment")
+    void testNvidiaSelection() {
+        AIProviderFactory factory = new AIProviderFactory("nvidia", openAIProvider, openAICompatibleProvider);
+
+        assertEquals("nvidia", factory.getConfiguredProviderName());
+        AIProvider provider = factory.getProvider();
+
+        assertNotNull(provider);
+        assertEquals("openai-compatible", provider.getProviderName());
+        assertTrue(provider instanceof OpenAICompatibleProvider);
     }
 }
