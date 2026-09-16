@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.unityagent.agent.model.*;
 import com.unityagent.agent.provider.AIProviderException;
 import com.unityagent.agent.provider.openai.OpenAICompatibleProvider;
+import com.unityagent.agent.provider.openai.OpenAIToolMapper;
 import com.unityagent.tools.ToolDefinition;
 import com.unityagent.tools.ToolMode;
 import com.unityagent.tools.ToolPermission;
@@ -353,5 +354,71 @@ class OpenAICompatibleProviderTest {
 
         assertEquals(502, ex.getStatusCode());
         assertTrue(ex.getMessage().contains("Malformed or empty response"));
+    }
+
+    @Test
+    @DisplayName("Should scrub Bearer, API key, sk-*, and nvapi-* secrets using precompiled patterns")
+    void testSecretScrubbingWithPrecompiledPatterns() {
+        String input = "Error: Bearer my_secret_bearer_token_123 failed; api_key=\"super_secret_key_456\"; " +
+                "key1=sk-abcdefghijklmnopqrstuvwxyz and key2=nvapi-1234567890abcdef12345";
+        String scrubbed = OpenAICompatibleProvider.scrub(input);
+
+        assertFalse(scrubbed.contains("my_secret_bearer_token_123"));
+        assertFalse(scrubbed.contains("super_secret_key_456"));
+        assertFalse(scrubbed.contains("sk-abcdefghijklmnopqrstuvwxyz"));
+        assertFalse(scrubbed.contains("nvapi-1234567890abcdef12345"));
+
+        assertTrue(scrubbed.contains("Bearer [SCRUBBED]"));
+        assertTrue(scrubbed.contains("api_key=\"[SCRUBBED]\"") || scrubbed.contains("[SCRUBBED]"));
+        assertTrue(scrubbed.contains("sk-[SCRUBBED]"));
+        assertTrue(scrubbed.contains("nvapi-[SCRUBBED]"));
+    }
+
+    @Test
+    @DisplayName("Should sanitize control tokens and parse repaired arguments in OpenAIToolMapper")
+    void testToolMapperSanitizationAndRepairedArguments() throws Exception {
+        // Test sanitizeContent
+        String rawContent = "<|im_start|>to=functions.create_cube\n<|action|>Valid Content<|im_end|>";
+        String cleanContent = OpenAIToolMapper.sanitizeContent(rawContent);
+        assertEquals("Valid Content", cleanContent);
+
+        // Test sanitizeName
+        String cleanName = OpenAIToolMapper.sanitizeName("<|special|>functions.create_primitivecommentary");
+        assertEquals("create_primitive", cleanName);
+
+        // Test sanitizeId
+        String cleanId = OpenAIToolMapper.sanitizeId("call_<|tok|>123@#$");
+        assertEquals("call_123", cleanId);
+
+        // Test parseResponseBody with markdown code fences and numeric argument repair
+        String responseWithCodeFence = """
+            {
+              "id": "chatcmpl-test",
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": null,
+                    "tool_calls": [
+                      {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {
+                          "name": "create_cube",
+                          "arguments": "```json\\n{\\"size\\": 5, \\"name\\": \\"BigCube\\"}\\n```"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+            """;
+        OpenAIToolMapper toolMapper = new OpenAIToolMapper(mapper);
+        var completion = toolMapper.parseResponseBody(responseWithCodeFence);
+        assertEquals(1, completion.getToolCalls().size());
+        assertEquals("create_cube", completion.getToolCalls().get(0).getName());
+        assertEquals(5, completion.getToolCalls().get(0).getArguments().get("size"));
+        assertEquals("BigCube", completion.getToolCalls().get(0).getArguments().get("name"));
     }
 }

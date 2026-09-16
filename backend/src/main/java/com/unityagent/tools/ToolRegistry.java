@@ -18,6 +18,8 @@ public class ToolRegistry {
     private static final Logger log = LoggerFactory.getLogger(ToolRegistry.class);
 
     private final ConcurrentHashMap<String, Tool> tools = new ConcurrentHashMap<>();
+    private volatile List<ToolDefinition> cachedDefinitions = null;
+    private final ConcurrentHashMap<String, List<Map<String, Object>>> cachedOpenAiToolDefs = new ConcurrentHashMap<>();
 
     /**
      * Construct the registry with all available Tool beans.
@@ -35,13 +37,15 @@ public class ToolRegistry {
     /**
      * Register a tool. Rejects duplicates.
      */
-    public void register(Tool tool) {
+    public synchronized void register(Tool tool) {
         Objects.requireNonNull(tool, "Tool cannot be null");
         Tool existing = tools.putIfAbsent(tool.name(), tool);
         if (existing != null) {
             throw new IllegalArgumentException(
                     "Duplicate tool registration: '" + tool.name() + "' is already registered");
         }
+        cachedDefinitions = null;
+        cachedOpenAiToolDefs.clear();
         log.debug("Registered tool: {}", tool.name());
     }
 
@@ -50,10 +54,12 @@ public class ToolRegistry {
      *
      * @return true if the tool was found and removed
      */
-    public boolean unregister(String name) {
+    public synchronized boolean unregister(String name) {
         if (name == null) return false;
         boolean removed = tools.remove(name) != null;
         if (removed) {
+            cachedDefinitions = null;
+            cachedOpenAiToolDefs.clear();
             log.info("Unregistered tool: {}", name);
         }
         return removed;
@@ -102,12 +108,10 @@ public class ToolRegistry {
     }
 
     /**
-     * @return all tool definitions
+     * @return all tool definitions (delegates to cached getDefinitions())
      */
     public List<ToolDefinition> listDefinitions() {
-        return tools.values().stream()
-                .map(Tool::definition)
-                .toList();
+        return getDefinitions();
     }
 
     /**
@@ -140,21 +144,24 @@ public class ToolRegistry {
      * Generate OpenAI-compatible tool specifications filtered by mode and allowed permissions.
      */
     public List<Map<String, Object>> getOpenAIToolDefinitions(ToolMode mode, Set<ToolPermission> allowedPermissions) {
-        List<Map<String, Object>> openAiTools = new ArrayList<>();
-        for (Tool tool : tools.values()) {
-            ToolDefinition def = tool.definition();
-            if (def.getPermission() == ToolPermission.BLOCKED) {
-                continue;
+        String cacheKey = (mode != null ? mode.name() : "ALL") + ":" + (allowedPermissions != null ? allowedPermissions.toString() : "ALL");
+        return cachedOpenAiToolDefs.computeIfAbsent(cacheKey, k -> {
+            List<Map<String, Object>> openAiTools = new ArrayList<>();
+            for (Tool tool : tools.values()) {
+                ToolDefinition def = tool.definition();
+                if (def.getPermission() == ToolPermission.BLOCKED) {
+                    continue;
+                }
+                if (allowedPermissions != null && !allowedPermissions.contains(def.getPermission())) {
+                    continue;
+                }
+                if (mode != null && !def.isAllowedInMode(mode)) {
+                    continue;
+                }
+                openAiTools.add(def.toOpenAITool());
             }
-            if (allowedPermissions != null && !allowedPermissions.contains(def.getPermission())) {
-                continue;
-            }
-            if (mode != null && !def.isAllowedInMode(mode)) {
-                continue;
-            }
-            openAiTools.add(def.toOpenAITool());
-        }
-        return openAiTools;
+            return Collections.unmodifiableList(openAiTools);
+        });
     }
 
     /**
@@ -227,12 +234,22 @@ public class ToolRegistry {
     }
 
     /**
-     * @return all tool definitions
+     * @return all tool definitions (cached immutable view)
      */
     public List<ToolDefinition> getDefinitions() {
-        List<ToolDefinition> defs = new ArrayList<>();
-        for (Tool tool : tools.values()) {
-            defs.add(tool.definition());
+        List<ToolDefinition> defs = cachedDefinitions;
+        if (defs == null) {
+            synchronized (this) {
+                defs = cachedDefinitions;
+                if (defs == null) {
+                    List<ToolDefinition> list = new ArrayList<>(tools.size());
+                    for (Tool tool : tools.values()) {
+                        list.add(tool.definition());
+                    }
+                    defs = Collections.unmodifiableList(list);
+                    cachedDefinitions = defs;
+                }
+            }
         }
         return defs;
     }

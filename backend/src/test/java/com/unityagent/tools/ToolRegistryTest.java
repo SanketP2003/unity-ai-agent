@@ -174,4 +174,108 @@ class ToolRegistryTest {
         assertEquals(1, requiringCompile.size());
         assertEquals("custom_play_tool", requiringCompile.get(0).name());
     }
+
+    @Test
+    void testCachedDefinitionsReusedAndImmutable() {
+        Tool tool1 = createTool("tool_alpha");
+        Tool tool2 = createTool("tool_beta");
+        ToolRegistry registry = new ToolRegistry(List.of(tool1, tool2));
+
+        List<ToolDefinition> defs1 = registry.getDefinitions();
+        List<ToolDefinition> defs2 = registry.getDefinitions();
+        List<ToolDefinition> defsList = registry.listDefinitions();
+
+        assertEquals(2, defs1.size());
+        assertSame(defs1, defs2, "Subsequent calls to getDefinitions() should return cached instance");
+        assertSame(defs1, defsList, "listDefinitions() should return the cached instance");
+
+        // Must be unmodifiable
+        assertThrows(UnsupportedOperationException.class, () ->
+                defs1.add(new ToolDefinition("tool_gamma", "desc", Map.of(), ToolPermission.SAFE, Set.of(ToolMode.BOTH), false, 30)));
+    }
+
+    @Test
+    void testCacheInvalidatedOnRegistrationAndUnregistration() {
+        Tool tool1 = createTool("tool_alpha");
+        ToolRegistry registry = new ToolRegistry(List.of(tool1));
+
+        List<ToolDefinition> defs1 = registry.getDefinitions();
+        assertEquals(1, defs1.size());
+
+        Tool tool2 = createTool("tool_beta");
+        registry.register(tool2);
+
+        List<ToolDefinition> defs2 = registry.getDefinitions();
+        assertEquals(2, defs2.size());
+        assertNotSame(defs1, defs2, "Cache should be invalidated after registration");
+
+        registry.unregister("tool_alpha");
+        List<ToolDefinition> defs3 = registry.getDefinitions();
+        assertEquals(1, defs3.size());
+        assertEquals("tool_beta", defs3.get(0).getName());
+        assertNotSame(defs2, defs3, "Cache should be invalidated after unregistration");
+    }
+
+    @Test
+    void testConcurrentCachedDefinitionsAccess() throws Exception {
+        Tool tool1 = createTool("concurrent_tool_1");
+        Tool tool2 = createTool("concurrent_tool_2");
+        ToolRegistry registry = new ToolRegistry(List.of(tool1, tool2));
+
+        int threadCount = 8;
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(threadCount);
+        List<java.util.concurrent.Callable<List<ToolDefinition>>> tasks = new java.util.ArrayList<>();
+
+        for (int i = 0; i < threadCount; i++) {
+            tasks.add(() -> registry.getDefinitions());
+        }
+
+        List<java.util.concurrent.Future<List<ToolDefinition>>> futures = executor.invokeAll(tasks);
+        List<ToolDefinition> firstResult = futures.get(0).get();
+        assertEquals(2, firstResult.size());
+
+        for (java.util.concurrent.Future<List<ToolDefinition>> future : futures) {
+            assertSame(firstResult, future.get(), "All concurrent calls should receive identical cached reference");
+        }
+        executor.shutdown();
+    }
+
+    @Test
+    void testToolDefinitionCachedOpenAITool() {
+        ToolDefinition def = new ToolDefinition("test_tool", "desc", Map.of("p", Map.of("type", "string")),
+                ToolPermission.SAFE, Set.of(ToolMode.BOTH), false, 30);
+
+        Map<String, Object> openAiTool1 = def.toOpenAITool();
+        Map<String, Object> openAiTool2 = def.toOpenAITool();
+
+        assertNotNull(openAiTool1);
+        assertSame(openAiTool1, openAiTool2, "Subsequent calls to toOpenAITool() should return identical cached instance");
+        assertThrows(UnsupportedOperationException.class, () -> openAiTool1.put("extra", "invalid"));
+    }
+
+    @Test
+    void testOpenAIToolDefinitionsCachedAndInvalidated() {
+        Tool tool1 = createTool("tool_one");
+        ToolRegistry registry = new ToolRegistry(List.of(tool1));
+
+        List<Map<String, Object>> openAiTools1 = registry.getOpenAIToolDefinitions();
+        List<Map<String, Object>> openAiTools2 = registry.getOpenAIToolDefinitions();
+
+        assertEquals(1, openAiTools1.size());
+        assertSame(openAiTools1, openAiTools2, "getOpenAIToolDefinitions() should return cached list instance");
+        assertThrows(UnsupportedOperationException.class, () -> openAiTools1.add(Map.of()));
+
+        // Invalidated on register
+        Tool tool2 = createTool("tool_two");
+        registry.register(tool2);
+        List<Map<String, Object>> openAiTools3 = registry.getOpenAIToolDefinitions();
+        assertEquals(2, openAiTools3.size());
+        assertNotSame(openAiTools1, openAiTools3, "Cache should be invalidated after registration");
+
+        // Invalidated on unregister
+        registry.unregister("tool_one");
+        List<Map<String, Object>> openAiTools4 = registry.getOpenAIToolDefinitions();
+        assertEquals(1, openAiTools4.size());
+        assertNotSame(openAiTools3, openAiTools4, "Cache should be invalidated after unregistration");
+    }
 }

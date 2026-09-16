@@ -20,40 +20,26 @@ namespace AutonomousUnityAgent.Editor
     [InitializeOnLoad]
     public class AgentBridge : EditorWindow
     {
-        private static float _lastAutoCheckTime = 0f;
+        public const string PrefWsUrl = "AutonomousAgent_WsUrl";
+        private const string DefaultWsUrl = "ws://localhost:8080/unity-bridge";
 
         [InitializeOnLoadMethod]
         private static void AutoStartBridge()
         {
             EditorApplication.delayCall += () =>
             {
-                if (!HasOpenInstances<AgentBridge>())
+                if (EditorPrefs.GetBool("AutonomousAgent_AutoOpenBridge", true))
                 {
-                    ShowWindow();
+                    if (!HasOpenInstances<AgentBridge>())
+                    {
+                        ShowWindow();
+                    }
                 }
             };
         }
 
-        static AgentBridge()
-        {
-            EditorApplication.update += EnsureRunning;
-            EditorApplication.delayCall += EnsureRunning;
-        }
-
-        private static void EnsureRunning()
-        {
-            if (EditorApplication.timeSinceStartup - _lastAutoCheckTime > 2.0f)
-            {
-                _lastAutoCheckTime = (float)EditorApplication.timeSinceStartup;
-                if (!HasOpenInstances<AgentBridge>())
-                {
-                    ShowWindow();
-                }
-            }
-        }
-
         // Connection configuration
-        private string _serverUrl = "ws://localhost:8080/unity-bridge";
+        private string _serverUrl = DefaultWsUrl;
         private int _serverPort = 8080;
 
         // State
@@ -70,7 +56,8 @@ namespace AutonomousUnityAgent.Editor
         private const float ReconnectDelay = 3f;
         private float _lastReconnectAttemptTime = 0f;
 
-        [MenuItem("Window/Autonomous Agent")]
+        [MenuItem("Window/Autonomous Agent", false, 50)]
+        [MenuItem("Window/Autonomous AI/Agent Bridge", false, 102)]
         public static void ShowWindow()
         {
             var window = GetWindow<AgentBridge>("Autonomous Agent");
@@ -81,6 +68,7 @@ namespace AutonomousUnityAgent.Editor
         private void OnEnable()
         {
             Application.runInBackground = true;
+            _serverUrl = EditorPrefs.GetString(PrefWsUrl, DefaultWsUrl);
             // Initialize persistent project identity
             var identity = ProjectIdentity.GetOrCreateIdentity();
             _projectId = identity.projectId;
@@ -533,7 +521,12 @@ namespace AutonomousUnityAgent.Editor
             EditorGUILayout.Space(5);
 
             // Server URL
-            _serverUrl = EditorGUILayout.TextField("Server URL:", _serverUrl);
+            string newServerUrl = EditorGUILayout.TextField("Server URL:", _serverUrl);
+            if (newServerUrl != _serverUrl)
+            {
+                _serverUrl = newServerUrl;
+                EditorPrefs.SetString(PrefWsUrl, _serverUrl);
+            }
         }
 
         private void DrawInfoSection()

@@ -130,16 +130,23 @@ public class ToolDefinition {
         return allowedModes.contains(mode);
     }
 
-    public Map<String, Object> toOpenAITool() {
-        Map<String, Object> functionObj = new LinkedHashMap<>();
-        functionObj.put("name", name);
-        functionObj.put("description", description);
-        functionObj.put("parameters", inputSchema);
+    private volatile Map<String, Object> cachedOpenAITool;
 
-        Map<String, Object> toolObj = new LinkedHashMap<>();
-        toolObj.put("type", "function");
-        toolObj.put("function", functionObj);
-        return toolObj;
+    public Map<String, Object> toOpenAITool() {
+        Map<String, Object> cached = cachedOpenAITool;
+        if (cached == null) {
+            Map<String, Object> functionObj = new LinkedHashMap<>();
+            functionObj.put("name", name);
+            functionObj.put("description", description);
+            functionObj.put("parameters", inputSchema);
+
+            Map<String, Object> toolObj = new LinkedHashMap<>();
+            toolObj.put("type", "function");
+            toolObj.put("function", Collections.unmodifiableMap(functionObj));
+            cached = Collections.unmodifiableMap(toolObj);
+            cachedOpenAITool = cached;
+        }
+        return cached;
     }
 
     @Override

@@ -67,4 +67,11 @@ class RepositoryCleanlinessGateTest {
         assertFalse(result.passed());
         assertTrue(result.violations().stream().anyMatch(v -> v.contains("Rogue empty 'Assets' directory")));
     }
+
+    @Test
+    void testActualRepositoryPassesGate() {
+        Path repoRoot = Path.of("..").toAbsolutePath().normalize();
+        RepositoryCleanlinessGate.GateResult result = gate.evaluate(repoRoot);
+        assertTrue(result.passed(), () -> "Violations in actual repository: " + String.join("; ", result.violations()));
+    }
 }

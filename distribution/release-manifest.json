@@ -22,8 +22,12 @@
       "name": "Autonomous Unity Agent Extension",
       "version": "1.0.0",
       "packageId": "com.unityagent.autonomous-ai-agent",
-      "targetUnity": "2022.3 LTS / 2023.2 LTS / 6000.0+",
-      "protocol": "WebSocket JSON-RPC 2.0 (ws://localhost:8080/ws/unity)"
+      "targetUnity": "2021.3 LTS / 2022.3 LTS / 2023.2 LTS / 6000.0+",
+      "protocol": "WebSocket JSON-RPC 2.0 (ws://localhost:8080/unity-bridge)",
+      "artifacts": [
+        "distribution/com.unityagent.autonomous-ai-agent-1.0.0.tgz",
+        "distribution/autonomous-ai-agent-extension-v1.0.0.zip"
+      ]
     },
     {
       "id": "web-studio",

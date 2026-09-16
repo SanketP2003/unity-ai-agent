@@ -21,6 +21,7 @@ import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Pattern;
 
 /**
  * AIProvider implementation for OpenAI-compatible LLM endpoints
@@ -37,6 +38,11 @@ import com.unityagent.agent.provider.ProviderCapabilities;
 public class OpenAICompatibleProvider implements AIProvider {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAICompatibleProvider.class);
+
+    private static final Pattern BEARER_PATTERN = Pattern.compile("Bearer\\s+([A-Za-z0-9_\\-\\.]+)");
+    private static final Pattern API_KEY_PATTERN = Pattern.compile("(?i)(api[_-]?key[\"':\\s=]+)([A-Za-z0-9_\\-\\.]+)");
+    private static final Pattern SK_PATTERN = Pattern.compile("sk-[A-Za-z0-9_\\-]{15,}");
+    private static final Pattern NVAPI_PATTERN = Pattern.compile("nvapi-[A-Za-z0-9_\\-]{15,}");
 
     private volatile String baseUrl;
     private volatile String apiKey;
@@ -273,10 +279,10 @@ public class OpenAICompatibleProvider implements AIProvider {
 
     public static String scrub(String input) {
         if (input == null) return "";
-        return input.replaceAll("Bearer\\s+([A-Za-z0-9_\\-\\.]+)", "Bearer [SCRUBBED]")
-                .replaceAll("(?i)(api[_-]?key[\"':\\s=]+)([A-Za-z0-9_\\-\\.]+)", "$1[SCRUBBED]")
-                .replaceAll("sk-[A-Za-z0-9_\\-]{15,}", "sk-[SCRUBBED]")
-                .replaceAll("nvapi-[A-Za-z0-9_\\-]{15,}", "nvapi-[SCRUBBED]");
+        String s = BEARER_PATTERN.matcher(input).replaceAll("Bearer [SCRUBBED]");
+        s = API_KEY_PATTERN.matcher(s).replaceAll("$1[SCRUBBED]");
+        s = SK_PATTERN.matcher(s).replaceAll("sk-[SCRUBBED]");
+        return NVAPI_PATTERN.matcher(s).replaceAll("nvapi-[SCRUBBED]");
     }
 
     @Override

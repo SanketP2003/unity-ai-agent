@@ -127,6 +127,11 @@ namespace AutonomousUnityAgent.Editor
             EditorPrefs.SetString(PrefBaseUrl, _baseUrl);
             EditorPrefs.SetString(PrefModel, _model);
 
+            // Synchronize default AgentBridge WebSocket URL if pointing to same runtime host
+            string wsScheme = _runtimeUrl.StartsWith("https", StringComparison.OrdinalIgnoreCase) ? "wss://" : "ws://";
+            string strippedHost = _runtimeUrl.Replace("http://", "").Replace("https://", "").TrimEnd('/');
+            EditorPrefs.SetString("AutonomousAgent_WsUrl", $"{wsScheme}{strippedHost}/unity-bridge");
+
             _isConnecting = true;
             _statusMessage = "Applying configuration to Agent Runtime...";
             Repaint();

@@ -66,15 +66,17 @@ public class MemoryDatabase {
     }
 
     /**
-     * Get a new database connection.
+     * Get a new database connection configured with high-performance PRAGMAs.
      * Caller is responsible for closing the connection.
      */
     public Connection getConnection() throws SQLException {
         Connection conn = DriverManager.getConnection(jdbcUrl);
-        // Enable WAL mode for better concurrent read performance
         try (Statement stmt = conn.createStatement()) {
-            stmt.execute("PRAGMA journal_mode=WAL");
             stmt.execute("PRAGMA foreign_keys=ON");
+            stmt.execute("PRAGMA synchronous=NORMAL");
+            stmt.execute("PRAGMA busy_timeout=5000");
+            stmt.execute("PRAGMA cache_size=-8000");
+            stmt.execute("PRAGMA mmap_size=33554432");
         }
         return conn;
     }
@@ -82,6 +84,9 @@ public class MemoryDatabase {
     private void initializeSchema() throws SQLException {
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
+
+            // Enable WAL mode once during initialization (persistent in database header)
+            stmt.execute("PRAGMA journal_mode=WAL");
 
             // Create all tables
             for (String ddl : MemorySchema.ALL_TABLES) {

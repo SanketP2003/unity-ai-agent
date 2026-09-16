@@ -16,12 +16,28 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Dedicated mapper that isolates OpenAI wire protocol formatting and parsing
  * from the provider-neutral agent architecture.
  */
 public class OpenAIToolMapper {
+
+    private static final Pattern CONTROL_TOKEN_PATTERN = Pattern.compile("(?s)<\\|.*?\\|>");
+    private static final Pattern CONTROL_TOKEN_SINGLE_PATTERN = Pattern.compile("<\\|[^>]*(\\|>|$)?");
+    private static final Pattern TO_PREFIX_PATTERN = Pattern.compile("(?m)^\\s*to=[^\\s\\n]+\\s*");
+    private static final Pattern TO_FUNCTIONS_PATTERN = Pattern.compile("to=functions\\.[^\\s\\n]*");
+    private static final Pattern INVALID_CONTROL_CHARS_PATTERN = Pattern.compile("[^\\x20-\\x7E\\r\\n\\t]");
+    private static final Pattern ID_CLEANUP_PATTERN = Pattern.compile("[^a-zA-Z0-9_-]");
+    private static final Pattern FUNCTIONS_PREFIX_PATTERN = Pattern.compile("^functions\\.");
+    private static final Pattern PYTHON_TAG_PATTERN = Pattern.compile("<\\|python_tag\\|>");
+    private static final Pattern GENERIC_CODE_BLOCK_START = Pattern.compile("^```[a-zA-Z]*\\s*");
+    private static final Pattern JSON_CODE_BLOCK_START = Pattern.compile("^```json");
+    private static final Pattern CODE_BLOCK_START = Pattern.compile("^```");
+    private static final Pattern CODE_BLOCK_END = Pattern.compile("```$");
+    private static final Pattern TRAILING_QUOTES_PATTERN = Pattern.compile("(?<=[0-9])\"(?=[,\\}\\]\\s])");
+    private static final Pattern TRAILING_COMMA_PATTERN = Pattern.compile(",\\s*([\\}\\]])");
 
     private final ObjectMapper mapper;
 
@@ -66,11 +82,11 @@ public class OpenAIToolMapper {
      */
     public static String sanitizeContent(String text) {
         if (text == null) return null;
-        String cleaned = text.replaceAll("(?s)<\\|.*?\\|>", "");
-        cleaned = cleaned.replaceAll("<\\|[^>]*(\\|>|$)?", "");
-        cleaned = cleaned.replaceAll("(?m)^\\s*to=[^\\s\n]+\\s*", "");
-        cleaned = cleaned.replaceAll("to=functions\\.[^\\s\n]*", "");
-        cleaned = cleaned.replaceAll("[^\\x20-\\x7E\\r\\n\\t]", ""); // strip invalid/corrupt non-ASCII/control characters
+        String cleaned = CONTROL_TOKEN_PATTERN.matcher(text).replaceAll("");
+        cleaned = CONTROL_TOKEN_SINGLE_PATTERN.matcher(cleaned).replaceAll("");
+        cleaned = TO_PREFIX_PATTERN.matcher(cleaned).replaceAll("");
+        cleaned = TO_FUNCTIONS_PATTERN.matcher(cleaned).replaceAll("");
+        cleaned = INVALID_CONTROL_CHARS_PATTERN.matcher(cleaned).replaceAll("");
         cleaned = cleaned.trim();
         return cleaned.isEmpty() ? null : cleaned;
     }
@@ -79,16 +95,18 @@ public class OpenAIToolMapper {
         if (id == null || id.isBlank()) {
             return "call_" + UUID.randomUUID().toString().substring(0, 8);
         }
-        String cleaned = id.replaceAll("<\\|[^>]*(\\|>|$)?", "")
-                           .replaceAll("[^a-zA-Z0-9_-]", "");
+        String cleaned = CONTROL_TOKEN_PATTERN.matcher(id).replaceAll("");
+        cleaned = CONTROL_TOKEN_SINGLE_PATTERN.matcher(cleaned).replaceAll("");
+        cleaned = ID_CLEANUP_PATTERN.matcher(cleaned).replaceAll("");
         return cleaned.isBlank() ? "call_" + Math.abs(id.hashCode()) : cleaned;
     }
 
     public static String sanitizeName(String name) {
         if (name == null || name.isBlank()) return "";
-        String cleaned = name.replaceAll("<\\|[^>]*(\\|>|$)?", "")
-                             .replaceAll("^functions\\.", "")
-                             .replaceAll("[^a-zA-Z0-9_-]", "");
+        String cleaned = CONTROL_TOKEN_PATTERN.matcher(name).replaceAll("");
+        cleaned = CONTROL_TOKEN_SINGLE_PATTERN.matcher(cleaned).replaceAll("");
+        cleaned = FUNCTIONS_PREFIX_PATTERN.matcher(cleaned).replaceAll("");
+        cleaned = ID_CLEANUP_PATTERN.matcher(cleaned).replaceAll("");
         if (cleaned.endsWith("commentary") && cleaned.length() > 10) {
             cleaned = cleaned.substring(0, cleaned.length() - 10);
         }
@@ -229,15 +247,15 @@ public class OpenAIToolMapper {
         if (toolCalls.isEmpty() && content != null && !content.isBlank()) {
             String trimmed = content.trim();
             if (trimmed.contains("<|python_tag|>")) {
-                trimmed = trimmed.substring(trimmed.indexOf("<|python_tag|>") + "<|python_tag|>".length()).trim();
+                trimmed = PYTHON_TAG_PATTERN.matcher(trimmed).replaceAll("").trim();
             }
             if (trimmed.startsWith("```json")) {
-                trimmed = trimmed.substring(7);
-                if (trimmed.endsWith("```")) trimmed = trimmed.substring(0, trimmed.length() - 3);
+                trimmed = JSON_CODE_BLOCK_START.matcher(trimmed).replaceAll("");
+                trimmed = CODE_BLOCK_END.matcher(trimmed).replaceAll("");
                 trimmed = trimmed.trim();
             } else if (trimmed.startsWith("```")) {
-                trimmed = trimmed.substring(3);
-                if (trimmed.endsWith("```")) trimmed = trimmed.substring(0, trimmed.length() - 3);
+                trimmed = CODE_BLOCK_START.matcher(trimmed).replaceAll("");
+                trimmed = CODE_BLOCK_END.matcher(trimmed).replaceAll("");
                 trimmed = trimmed.trim();
             }
             if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
@@ -287,11 +305,13 @@ public class OpenAIToolMapper {
         } catch (Exception e) {
             try {
                 if (cleaned.startsWith("```")) {
-                    cleaned = cleaned.replaceAll("^```[a-zA-Z]*\\s*", "").replaceAll("```$", "").trim();
+                    cleaned = GENERIC_CODE_BLOCK_START.matcher(cleaned).replaceAll("");
+                    cleaned = CODE_BLOCK_END.matcher(cleaned).replaceAll("");
+                    cleaned = cleaned.trim();
                 }
                 // Repair common LLM quirks: stray quotes immediately following numbers, trailing commas
-                String repaired = cleaned.replaceAll("(?<=[0-9])\"(?=[,\\}\\]\\s])", "")
-                                         .replaceAll(",\\s*([\\}\\]])", "$1");
+                String repaired = TRAILING_QUOTES_PATTERN.matcher(cleaned).replaceAll("");
+                repaired = TRAILING_COMMA_PATTERN.matcher(repaired).replaceAll("$1");
                 return mapper.readValue(repaired, new TypeReference<>() {});
             } catch (Exception ignored) {
                 return Map.of();

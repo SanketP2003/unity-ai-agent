@@ -31,6 +31,8 @@ sysinfo.txt
 *.unitypackage
 *.app
 crashlytics-build.properties
+**/_Recovery/
+**/_Recovery.meta
 
 # Studio runtime databases and quarantine
 *.db
