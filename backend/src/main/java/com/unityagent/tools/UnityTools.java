@@ -1431,5 +1431,39 @@ public class UnityTools {
 
         @Override public String validate(Map<String, Object> parameters) { return null; }
     }
+
+    @Component
+    public static class GenerateTrellisMesh implements Tool {
+        @Override public String name() { return "generate_trellis_mesh"; }
+        @Override public String description() {
+            return "Generates high-detail textured 3D meshes (characters, creatures, vehicles, buildings, props) using Microsoft TRELLIS 2 from a text prompt or image, and places them into the Unity active scene.";
+        }
+        @Override public ToolPermission permission() { return ToolPermission.SAFE; }
+        @Override public Set<ToolMode> allowedModes() { return Set.of(ToolMode.BOTH); }
+        @Override public String domain() { return "ASSETS"; }
+        @Override public int timeoutSeconds() { return 180; }
+
+        @Override public Map<String, Object> inputSchema() {
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("prompt", Map.of("type", "string", "description", "Text description of the 3D model (e.g. 'futuristic battle drone', 'alien statue')"));
+            props.put("image_path", Map.of("type", "string", "description", "Optional local file path to an image for image-to-3D generation"));
+            props.put("asset_name", Map.of("type", "string", "description", "Name of the asset file and GameObject (e.g. 'BattleDrone')"));
+            props.put("position", vector3Schema("Spawn position in scene"));
+            props.put("rotation", vector3Schema("Euler rotation in scene"));
+            props.put("scale", vector3Schema("Scale vector"));
+            props.put("add_collider", Map.of("type", "boolean", "description", "Whether to attach colliders (default true)"));
+            props.put("parent", Map.of("type", "string", "description", "Optional parent GameObject name"));
+            return Map.of("type", "object", "properties", props, "required", List.of("asset_name"));
+        }
+
+        @Override public String validate(Map<String, Object> parameters) {
+            if (parameters == null) return "Parameters required";
+            if (!parameters.containsKey("asset_name")) return "Parameter 'asset_name' is required";
+            if (!parameters.containsKey("prompt") && !parameters.containsKey("image_path")) {
+                return "Either 'prompt' or 'image_path' must be provided for TRELLIS generation";
+            }
+            return null;
+        }
+    }
 }
 

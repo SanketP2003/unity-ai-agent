@@ -250,6 +250,9 @@ namespace AutonomousUnityAgent.Editor
             _toolDispatcher.Register(new ValidateBuildSettingsTool());
             _toolDispatcher.Register(new GetPlatformCapabilitiesTool());
 
+            // 3D Generative AI tools (TRELLIS / TRELLIS 2)
+            _toolDispatcher.Register(new GenerateTrellisMeshTool());
+
             // Hook into the Editor update loop to process messages on the main thread
             EditorApplication.update += OnEditorUpdate;
             EditorApplication.delayCall += Connect;
